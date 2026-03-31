@@ -1317,6 +1317,7 @@ function renderNMP(){
     if(rb.n!==undefined){totN+=fertN*ha; totP+=Math.max(0,(rb.p||0)-mpN)*ha; totK+=Math.max(0,(rb.k||0))*ha;}
     const limeNeeded=f.ph>0&&f.ph<6.0?Math.round((6.0-f.ph)*4):0;
     totLime+=limeNeeded*ha;
+    const crop = f.crop||'';
     const isSFI = crop && (crop.includes('CLIG3')||crop.includes('CNUM2')||crop.includes('CSAM3')||crop.includes('GS2')||crop.includes('GS4'));
     const nmaxStr = rb.nmax ? (isSFI ? rb.nmax+' (SFI)' : rb.nmax) : 'N';
     const over=rb.nmax&&rb.n>rb.nmax;
