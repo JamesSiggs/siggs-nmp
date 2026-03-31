@@ -1723,7 +1723,14 @@ function renderSMP(){
 }
 
 // ═══════════════════════════ RENDER ALL ═══════════════════════════
-function renderAll(){ renderFldList(); calcTotalArea(); renderManurePlan(); renderMPSummary(); renderDash(); renderNMP(); renderRecs(); renderNBal(); renderSMP(); renderNVZ(); renderLV(); renderIMP(); updateRecFieldSel(); if(S.farm.name){document.getElementById('hdrFarm').innerHTML='<strong>'+S.farm.name+'</strong>'; document.getElementById('dsh-nofarm').style.display='none'; document.getElementById('dsh-main').style.display='block';} }
+function renderAll(){
+  // Recalculate RB209 for all fields in case f.rb is stale or missing
+  S.fields.forEach(f=>{
+    const sns=getSNS(f.crop,f.prev,f.rain,f.soiltype);
+    const fn=RB209[f.crop];
+    if(fn){ f.rb=fn(sns,parseInt(f.pidx)||1,f.kidx||'1',f.gc||'Average',f.yield||0); f.sns=sns; }
+  });
+  renderFldList(); calcTotalArea(); renderManurePlan(); renderMPSummary(); renderDash(); renderNMP(); renderRecs(); renderNBal(); renderSMP(); renderNVZ(); renderLV(); renderIMP(); updateRecFieldSel(); if(S.farm.name){document.getElementById('hdrFarm').innerHTML='<strong>'+S.farm.name+'</strong>'; document.getElementById('dsh-nofarm').style.display='none'; document.getElementById('dsh-main').style.display='block';} }
 
 // ═══════════════════════════ UTILS ═══════════════════════════
 function v(id){ const e=document.getElementById(id); return e?e.value:''; }
