@@ -293,16 +293,6 @@ tbody td{padding:9px 11px;vertical-align:middle}
             </div>
             <div class="fg"><label>Expected Yield (t/ha)</label><input id="fd-yield" type="number" placeholder="8.0" step="0.5" oninput="calcRB()"></div>
           </div>
-          <!-- SFI ACTION PANEL — shown when SFI crop selected -->
-          <div id="sfi-panel" style="display:none;background:#fff8e1;border:1.5px solid #f59e0b;border-radius:8px;padding:12px;margin-bottom:12px">
-            <div style="font-weight:700;color:#92400e;font-size:13px;margin-bottom:6px" id="sfi-title">⚠️ SFI Action selected</div>
-            <div style="font-size:12px;color:#78350f;line-height:1.6" id="sfi-desc"></div>
-            <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
-              <span style="background:#1a5c35;color:white;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700" id="sfi-rate"></span>
-              <span style="background:#fff;border:1px solid #f59e0b;color:#92400e;padding:3px 10px;border-radius:20px;font-size:11px" id="sfi-duration">Duration: 3 years</span>
-            </div>
-          </div>
-
           <div class="fr">
             <div class="fg"><label>Previous Crop</label><select id="fd-prev"><option>Grass (perm)</option><option>Grass (long ley 3+yr)</option><option>Grass (short ley 1-2yr)</option><option>W Wheat</option><option>W Barley</option><option>OSR</option><option>Maize</option><option>Beans/Peas</option><option>Potatoes</option><option>Brassicas</option><option>Sugar Beet</option></select></div>
             <div class="fg"><label>Soil Type</label><select id="fd-soiltype" onchange="calcRB()"><option>Medium</option><option>Heavy Clay</option><option>Light/Sandy</option><option>Shallow</option><option>Deep Clay</option><option>Peat</option></select></div>
@@ -405,14 +395,6 @@ tbody td{padding:9px 11px;vertical-align:middle}
       <div class="stat bl"><div class="stat-lbl">Total P₂O₅</div><div class="stat-val" id="nm-p">—</div><div class="stat-unit">kg P₂O₅</div></div>
       <div class="stat"><div class="stat-lbl">Total K₂O</div><div class="stat-val" id="nm-k">—</div><div class="stat-unit">kg K₂O</div></div>
       <div class="stat am"><div class="stat-lbl">Lime required</div><div class="stat-val" id="nm-lime">—</div><div class="stat-unit">tonnes</div></div>
-    </div>
-    <!-- SFI PAYMENT SUMMARY -->
-    <div id="sfi-summary" style="display:none;margin-top:14px;background:#f0faf4;border:1.5px solid var(--gp);border-radius:8px;padding:14px">
-      <div style="font-weight:700;color:var(--gd);font-size:13px;margin-bottom:8px">💷 SFI Actions in this plan</div>
-      <div class="tw"><table><thead><tr><th>Field</th><th>Ha</th><th>SFI Action</th><th>Rate</th><th>Annual payment</th><th>N limit</th><th>Key restriction</th></tr></thead><tbody id="sfi-tbl"></tbody></table></div>
-      <div style="margin-top:8px;font-size:13px;font-weight:600;color:var(--gd)">Total estimated annual SFI income: <span id="sfi-total" style="font-size:16px">£0</span></div>
-    </div>
-    <div style="display:none">
     </div>
   </div>
   <div class="card">
@@ -986,14 +968,6 @@ const RB209={
   'Potato - Main Crop':(sns)=>({n:Math.max(0,250-(sns*60)),p:170,k:260,mg:40,s:60,nmax:null}),
   'Cauliflower':()=>({n:270,p:120,k:140,mg:0,s:40,nmax:null}),
   'Fallow / Cover Crop':()=>({n:0,p:0,k:0,mg:0,s:0,nmax:null}),
-  // CS GS2: Permanent grassland very low inputs — no inorganic N, liming only. £151/ha/yr (CS Mid/Higher Tier)
-  // Very similar to CLIG3. No fertiliser, no herbicides except spot treatment, no cultivation.
-  // Maintain pH above 5.4 by liming if needed. Max equiv. ~12t/ha FYM if needed.
-  'GS2 — Permanent grassland very low inputs':()=>({n:18,p:15,k:25,mg:0,s:0,nmax:18,sfi:'GS2',sfiRate:151,sfiNote:'No inorganic N. Lime to maintain pH >5.4. Max equiv 12t/ha FYM. No herbicides except spot treatment. No cultivation. 5-year CS agreement.'}),
-  // CS GS4: Legume and herb-rich swards — NO nitrogen fertiliser at all. P and K permitted. £382/ha/yr
-  // Min 20% legumes/herbs (excl white clover). Min 5 grass + 4 legume + 4 herb species in mix.
-  // Can use manures and P/K fertiliser but no N fertiliser whatsoever.
-  'GS4 — Legume and herb-rich swards':()=>({n:0,p:30,k:40,mg:0,s:0,nmax:0,sfi:'GS4',sfiRate:382,sfiNote:'No N fertiliser. P and K permitted (not N). Min 20% legume/herb cover. Min 5 grass + 4 legume + 4 herb species. No pesticides except spot treatment. 5-year CS agreement.'}),
   // SFI ACTIONS — nutrient input restrictions apply
   // CLIG3: Max 12t/ha cattle FYM or equivalent available N (= 18 kg avail N/ha total from all sources)
   // No inorganic N, no digestate. £151/ha/yr
@@ -1005,7 +979,7 @@ const RB209={
   'CSAM3 — Herbal ley':()=>({n:40,p:25,k:40,mg:0,s:0,nmax:40,sfi:'CSAM3',sfiRate:382,sfiNote:'Max 40 kg inorganic N/ha. No digestate. No pesticides (except spot treatment). £382/ha/yr.'}),
 };
 function getSNS(crop,prev,rain,soil){
-  if(crop&&(crop.includes('Grass')||crop.includes('Clover')||crop.includes('CLIG3')||crop.includes('CNUM2')||crop.includes('CSAM3')||crop.includes('GS2')||crop.includes('GS4'))) return 0;
+  if(crop&&(crop.includes('Grass')||crop.includes('Clover')||crop.includes('CLIG3')||crop.includes('CNUM2')||crop.includes('CSAM3'))) return 0;
   if(prev&&prev.includes('long ley')) return 3;
   if(prev&&(prev.includes('Grass')||prev.includes('Beans'))) return 2;
   if(prev&&prev.includes('Potatoes')) return 1;
@@ -1028,46 +1002,7 @@ function mgIdx(){
   document.getElementById('fd-mgidx').value=i;
 }
 function calcRB(){
-  const crop=v('fd-crop')
-  // SFI panel
-  const sfiPanel = document.getElementById('sfi-panel');
-  const SFI_INFO = {
-    'CLIG3 — Very low input grassland': {
-      title: '🌿 CLIG3 — Manage grassland with very low nutrient inputs',
-      desc: '<strong>Max nutrient input:</strong> 12t/ha cattle FYM or equivalent available N (≈18 kg avail N/ha from all sources combined).<br><strong>Prohibited:</strong> No digestate, no industrial by-products, no inorganic fertiliser, no ploughing, no drainage works, no pesticides (except spot treatment of injurious weeds).<br><strong>Required:</strong> Intact grass sward, no poaching, graze or cut to achieve flowering grasses/wildflowers.',
-      rate: '£151/ha/year', duration: '3 years · Static action'
-    },
-    'CNUM2 — Legumes on grassland': {
-      title: '🌱 CNUM2 — Legumes on improved grassland',
-      desc: '<strong>Inorganic N limit:</strong> Keep to minimum — excess N suppresses legume content. Target no more than 40 kg inorganic N/ha.<br><strong>Required:</strong> Establish and maintain legumes (red/white clover, sainfoin, lucerne, bird's foot trefoil etc.) growing from spring to early autumn.<br><strong>Prohibited:</strong> Land with historic or archaeological features ineligible.',
-      rate: '£102/ha/year', duration: '3 years · Rotational or static'
-    },
-    'CSAM3 — Herbal ley': {
-      title: '🌾 CSAM3 — Herbal leys',
-      desc: '<strong>Inorganic N limit:</strong> Minimise — max ~40 kg N/ha/year.<br><strong>Seed mix:</strong> Must include at least 1 grass species, 2 legume species, 2 herb or wildflower species.<br><strong>Prohibited:</strong> No digestate, no pesticides (except spot treatment), no storage on established ley. SSSIs and historic features ineligible.<br><strong>Note:</strong> New leys static for agreement duration. Existing leys can rotate after second summer.',
-      rate: '£382/ha/year', duration: '3 years · Static (new ley) or rotational (existing)'
-    },
-    'GS2 — Permanent grassland very low inputs': {
-      title: '🌿 GS2 — Permanent grassland with very low inputs (outside SDAs) — now same rate as CLIG3',
-      desc: '<strong>Inorganic N:</strong> None permitted.<br><strong>Organic manure:</strong> Equivalent of max 12t/ha cattle FYM (≈18 kg avail N/ha) if needed — but typically none required on semi-improved swards.<br><strong>Lime:</strong> Permitted and encouraged to maintain pH above 5.4.<br><strong>P &amp; K:</strong> Not normally applied under this option — aim is very low inputs overall.<br><strong>Prohibited:</strong> No fertilisers, no herbicides except spot treatment of injurious weeds, no cultivation, no drainage works, no re-seeding, no pesticides.<br><strong>Required:</strong> Graze or cut to achieve flowering grasses and wildflowers. Varied sward height with tussocky grass by autumn.<br><strong>Note:</strong> Land must qualify as semi-improved or meet other eligibility criteria. Not the same as CLIG3 — CS is a 5-year agreement; cannot be claimed alongside CLIG3 on same parcel.',
-      rate: '£151/ha/year', duration: '5 years · CS Mid or Higher Tier'
-    },
-    'GS4 — Legume and herb-rich swards': {
-      title: '🌱 GS4 — Legume and herb-rich swards',
-      desc: '<strong>Nitrogen fertiliser:</strong> None permitted whatsoever — this option replaces N with biological fixation.<br><strong>P and K:</strong> Permitted — soil can be improved with lime, manures or P/K fertiliser (but NOT nitrogen).<br><strong>Seed mix:</strong> Minimum 5 grass species, 4 legume species, 4 herb or wildflower species. Must maintain ≥20% cover of legumes and herbs (excluding white clover and creeping buttercup).<br><strong>Prohibited:</strong> No N fertiliser, no pesticides except spot treatment. Historic/archaeological features ineligible.<br><strong>Soil:</strong> Clovers grow poorly below pH 6.0 or P/K index below 2 — address soil fertility with lime and P/K before establishment.<br><strong>Note:</strong> Not suitable for valuable semi-natural permanent pasture. Rotational — can move around farm.',
-      rate: '£382/ha/year', duration: '5 years · CS Mid or Higher Tier · Rotational'
-    }
-  };
-  const info = SFI_INFO[crop];
-  if(info && sfiPanel) {
-    sfiPanel.style.display = 'block';
-    document.getElementById('sfi-title').innerHTML = info.title;
-    document.getElementById('sfi-desc').innerHTML = info.desc;
-    document.getElementById('sfi-rate').textContent = info.rate;
-    document.getElementById('sfi-duration').textContent = info.duration;
-  } else if(sfiPanel) {
-    sfiPanel.style.display = 'none';
-  }, y=pf('fd-yield'), ph=pf('fd-ph');
+  const crop=v('fd-crop'), y=pf('fd-yield'), ph=pf('fd-ph');
   const pI=parseInt(v('fd-pidx'))||2, kI=v('fd-kidx')||'2-';
   const gc=v('fd-gc'), prev=v('fd-prev'), rain=v('fd-rain'), soil=v('fd-soiltype');
   const bio=pf('fd-biocred')||0;
@@ -1127,7 +1062,7 @@ function renderDash(){
       <td>${rb.n!==undefined?rb.n:'—'}</td>
       <td>${appN||0}</td>
       <td style="font-weight:600;color:${rem<0?'var(--rd)':'var(--gd)'}">${rb.n!==undefined?rem:''}</td>
-      <td>${f.nvz==='yes'?'<span class="badge bg-a">NVZ</span>':''}${f.crop&&f.crop.includes('CLIG3')?'<span class="badge bg-r" style="margin-left:2px">CLIG3</span>':''}${f.crop&&f.crop.includes('CNUM2')?'<span class="badge" style="background:#d97706;color:white;margin-left:2px">CNUM2</span>':''}${f.crop&&f.crop.includes('CSAM3')?'<span class="badge bg-g" style="margin-left:2px">CSAM3</span>':''}${f.crop&&f.crop.includes('GS2')?'<span class="badge" style="background:#1d4ed8;color:white;margin-left:2px">GS2</span>':''}${f.crop&&f.crop.includes('GS4')?'<span class="badge" style="background:#6d28d9;color:white;margin-left:2px">GS4</span>':''}</td>
+      <td>${f.nvz==='yes'?'<span class="badge bg-a">NVZ</span>':'<span class="badge bg-x">—</span>'}</td>
     </tr>`;
   }).join('');
 }
@@ -1180,8 +1115,7 @@ function renderNMP(){
     if(rb.n!==undefined){totN+=fertN*ha; totP+=Math.max(0,(rb.p||0)-mpN)*ha; totK+=Math.max(0,(rb.k||0))*ha;}
     const limeNeeded=f.ph>0&&f.ph<6.0?Math.round((6.0-f.ph)*4):0;
     totLime+=limeNeeded*ha;
-    const isSFI = crop && (crop.includes('CLIG3')||crop.includes('CNUM2')||crop.includes('CSAM3')||crop.includes('GS2')||crop.includes('GS4'));
-    const nmaxStr = rb.nmax ? (isSFI ? rb.nmax+' (SFI)' : rb.nmax) : 'N';
+    const nmaxStr=rb.nmax?rb.nmax:'N';
     const over=rb.nmax&&rb.n>rb.nmax;
     return `<tr class="${over?'tr-over':''}">
       <td><strong>${f.name}</strong></td><td>${f.ha}</td><td>${f.crop}</td>
@@ -1196,26 +1130,6 @@ function renderNMP(){
       <td>${f.nvz==='yes'?'<span class="badge bg-a">NVZ</span>':''}${f.rb&&f.rb.sfi?'<span class="badge bg-g" style="margin-left:3px">'+f.rb.sfi+'</span>':''}</td>
     </tr>`;
   }).join('');
-  // SFI summary
-  const sfiFields = S.fields.filter(f=>f.crop&&(f.crop.includes('CLIG3')||f.crop.includes('CNUM2')||f.crop.includes('CSAM3')||f.crop.includes('GS2')||f.crop.includes('GS4')));
-  const sfiSummary = document.getElementById('sfi-summary');
-  if(sfiFields.length && sfiSummary) {
-    sfiSummary.style.display = 'block';
-    const SFI_RATES = {'CLIG3':151,'CNUM2':102,'CSAM3':382,'GS2':151,'GS4':382};
-    const SFI_RESTRICT = {'CLIG3':'No inorganic N, no digestate','CNUM2':'Minimise inorganic N, maintain legumes','CSAM3':'No digestate, min 1 grass+2 legume+2 herb','GS2':'No inorganic N, lime to pH>5.4, no cultivation','GS4':'No N fertiliser at all, P&K permitted'};
-    let totalPay = 0;
-    const tbl = document.getElementById('sfi-tbl');
-    tbl.innerHTML = sfiFields.map(f=>{
-      const code = f.crop.includes('CLIG3')?'CLIG3':f.crop.includes('CNUM2')?'CNUM2':f.crop.includes('CSAM3')?'CSAM3':f.crop.includes('GS2')?'GS2':'GS4';
-      const rate = SFI_RATES[code];
-      const pay = f.ha * rate;
-      totalPay += pay;
-      const nLim = f.crop.includes('CLIG3')||f.crop.includes('GS2')?'18 kg avail N/ha (max)':f.crop.includes('GS4')?'Zero N fertiliser':'40 kg inorganic N/ha';
-      return `<tr><td><strong>${f.name}</strong></td><td>${f.ha}</td><td><span class="badge bg-g">${code}</span></td><td>£${rate}/ha</td><td style="font-weight:700;color:var(--gd)">£${pay.toFixed(0)}</td><td>${nLim}</td><td style="font-size:11px;color:var(--gx)">${SFI_RESTRICT[code]}</td></tr>`;
-    }).join('');
-    document.getElementById('sfi-total').textContent = '£'+totalPay.toFixed(0)+'/yr';
-  } else if(sfiSummary) { sfiSummary.style.display = 'none'; }
-
   document.getElementById('nm-n').textContent=Math.round(totN);
   document.getElementById('nm-p').textContent=Math.round(totP);
   document.getElementById('nm-k').textContent=Math.round(totK);
@@ -1329,8 +1243,7 @@ function saveManurePlan() {
   // SFI restriction check
   const fld2 = S.fields.find(ff=>ff.name===field);
   const sfiCrop = fld2 && fld2.crop ? fld2.crop : '';
-  const isCLIG3 = sfiCrop.includes('CLIG3') || sfiCrop.includes('GS2');
-  const isGS4 = sfiCrop.includes('GS4');
+  const isCLIG3 = sfiCrop.includes('CLIG3');
   const isSFI40 = sfiCrop.includes('CNUM2') || sfiCrop.includes('CSAM3');
   const vals2 = MP_VALS[type] || {};
   const availN = (vals2.an||0)*rate;
