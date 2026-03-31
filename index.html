@@ -408,13 +408,11 @@ tbody td{padding:9px 11px;vertical-align:middle}
       <div class="stat"><div class="stat-lbl">Total K₂O</div><div class="stat-val" id="nm-k">—</div><div class="stat-unit">kg K₂O</div></div>
       <div class="stat am"><div class="stat-lbl">Lime required</div><div class="stat-val" id="nm-lime">—</div><div class="stat-unit">tonnes</div></div>
     </div>
-    <!-- SFI PAYMENT SUMMARY -->
-    <div id="sfi-summary" style="display:none;margin-top:14px;background:#f0faf4;border:1.5px solid var(--gp);border-radius:8px;padding:14px">
+    <!-- SFI PAYMENT SUMMARY (handled by renderSFISummary) -->
+    <div id="sfi-summary2" style="display:none;margin-top:14px;background:#f0faf4;border:1.5px solid var(--gp);border-radius:8px;padding:14px">
       <div style="font-weight:700;color:var(--gd);font-size:13px;margin-bottom:8px">💷 SFI Actions in this plan</div>
       <div class="tw"><table><thead><tr><th>Field</th><th>Ha</th><th>SFI Action</th><th>Rate</th><th>Annual payment</th><th>N limit</th><th>Key restriction</th></tr></thead><tbody id="sfi-tbl"></tbody></table></div>
       <div style="margin-top:8px;font-size:13px;font-weight:600;color:var(--gd)">Total estimated annual SFI income: <span id="sfi-total" style="font-size:16px">£0</span></div>
-    </div>
-    <div style="display:none">
     </div>
   </div>
   <div class="card">
@@ -426,7 +424,7 @@ tbody td{padding:9px 11px;vertical-align:middle}
     <div class="alert al-g" style="margin-bottom:12px">These fields are entered into SFI actions with specific nutrient input restrictions. Ensure planned manure and fertiliser applications comply with the limits shown.</div>
     <div class="tw"><table>
       <thead><tr><th>Field</th><th>Ha</th><th>SFI Action</th><th>Payment £/ha/yr</th><th>Total payment £/yr</th><th>N limit (kg/ha)</th><th>Planned avail N</th><th>Status</th></tr></thead>
-      <tbody id="sfi-tbl"></tbody>
+      <tbody id="sfi-tbl2"></tbody>
     </table></div>
   </div>
 
@@ -1273,7 +1271,7 @@ function renderDash(){
 function renderSFISummary(){
   const sfiFields = S.fields.filter(f=>f.rb&&f.rb.sfi);
   const card = document.getElementById('sfi-summary-card');
-  const tb = document.getElementById('sfi-tbl');
+  const tb = document.getElementById('sfi-tbl2');
   if(!card||!tb) return;
   if(!sfiFields.length){ card.style.display='none'; return; }
   card.style.display='block';
@@ -1334,26 +1332,7 @@ function renderNMP(){
       <td>${f.nvz==='yes'?'<span class="badge bg-a">NVZ</span>':''}${f.rb&&f.rb.sfi?'<span class="badge bg-g" style="margin-left:3px">'+f.rb.sfi+'</span>':''}</td>
     </tr>`;
   }).join('');
-  // SFI summary
-  const sfiFields = S.fields.filter(f=>f.crop&&(f.crop.includes('CLIG3')||f.crop.includes('CNUM2')||f.crop.includes('CSAM3')||f.crop.includes('GS2')||f.crop.includes('GS4')));
-  const sfiSummary = document.getElementById('sfi-summary');
-  if(sfiFields.length && sfiSummary) {
-    sfiSummary.style.display = 'block';
-    const SFI_RATES = {'CLIG3':151,'CNUM2':102,'CSAM3':382,'GS2':151,'GS4':382};
-    const SFI_RESTRICT = {'CLIG3':'No inorganic N, no digestate','CNUM2':'Minimise inorganic N, maintain legumes','CSAM3':'No digestate, min 1 grass+2 legume+2 herb','GS2':'No inorganic N, lime to pH>5.4, no cultivation','GS4':'No N fertiliser at all, P&K permitted'};
-    let totalPay = 0;
-    const tbl = document.getElementById('sfi-tbl');
-    tbl.innerHTML = sfiFields.map(f=>{
-      const code = f.crop.includes('CLIG3')?'CLIG3':f.crop.includes('CNUM2')?'CNUM2':f.crop.includes('CSAM3')?'CSAM3':f.crop.includes('GS2')?'GS2':'GS4';
-      const rate = SFI_RATES[code];
-      const pay = f.ha * rate;
-      totalPay += pay;
-      const nLim = f.crop.includes('CLIG3')||f.crop.includes('GS2')?'18 kg avail N/ha (max)':f.crop.includes('GS4')?'Zero N fertiliser':'40 kg inorganic N/ha';
-      return `<tr><td><strong>${f.name}</strong></td><td>${f.ha}</td><td><span class="badge bg-g">${code}</span></td><td>£${rate}/ha</td><td style="font-weight:700;color:var(--gd)">£${pay.toFixed(0)}</td><td>${nLim}</td><td style="font-size:11px;color:var(--gx)">${SFI_RESTRICT[code]}</td></tr>`;
-    }).join('');
-    document.getElementById('sfi-total').textContent = '£'+totalPay.toFixed(0)+'/yr';
-  } else if(sfiSummary) { sfiSummary.style.display = 'none'; }
-
+  renderSFISummary();
   document.getElementById('nm-n').textContent=Math.round(totN);
   document.getElementById('nm-p').textContent=Math.round(totP);
   document.getElementById('nm-k').textContent=Math.round(totK);
