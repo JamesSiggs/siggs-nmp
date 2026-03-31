@@ -1175,7 +1175,7 @@ function calcRB(){
     },
     'CNUM2 — Legumes on grassland': {
       title: '🌱 CNUM2 — Legumes on improved grassland',
-      desc: '<strong>Inorganic N limit:</strong> Keep to minimum — excess N suppresses legume content. Target no more than 40 kg inorganic N/ha.<br><strong>Required:</strong> Establish and maintain legumes (red/white clover, sainfoin, lucerne, bird's foot trefoil etc.) growing from spring to early autumn.<br><strong>Prohibited:</strong> Land with historic or archaeological features ineligible.',
+      desc: '<strong>Inorganic N limit:</strong> Keep to minimum — excess N suppresses legume content. Target no more than 40 kg inorganic N/ha.<br><strong>Required:</strong> Establish and maintain legumes (red/white clover, sainfoin, lucerne, bird\'s foot trefoil etc.) growing from spring to early autumn.<br><strong>Prohibited:</strong> Land with historic or archaeological features ineligible.',
       rate: '£102/ha/year', duration: '3 years · Rotational or static'
     },
     'CSAM3 — Herbal ley': {
@@ -1203,7 +1203,8 @@ function calcRB(){
     document.getElementById('sfi-duration').textContent = info.duration;
   } else if(sfiPanel) {
     sfiPanel.style.display = 'none';
-  }, y=pf('fd-yield'), ph=pf('fd-ph');
+  }
+  const y=pf('fd-yield'), ph=pf('fd-ph');
   const pI=parseInt(v('fd-pidx'))||2, kI=v('fd-kidx')||'2-';
   const gc=v('fd-gc'), prev=v('fd-prev'), rain=v('fd-rain'), soil=v('fd-soiltype');
   const bio=pf('fd-biocred')||0;
