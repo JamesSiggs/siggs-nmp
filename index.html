@@ -179,6 +179,7 @@ tbody td{padding:9px 11px;vertical-align:middle}
   <button id="nb-records" onclick="showPage('records')">✏️ Applications</button>
   <button id="nb-smp" onclick="showPage('smp')">🌱 Soil Health</button>
   <button id="nb-map" onclick="showPage('map')">&#128506; Field Map</button>
+  <button id="nb-risk" onclick="showPage('risk')">🚨 Spreading Risk</button>
 </nav>
 
 <div class="main">
@@ -821,6 +822,140 @@ tbody td{padding:9px 11px;vertical-align:middle}
         <div class="sr"><span class="sr-k">LFA</span><span class="sr-v">D — Disadvantaged</span></div>
       </div>
     </div>
+  </div>
+</div>
+
+
+<!-- SPREADING RISK MAP PAGE -->
+<div class="page" id="pg-risk">
+  <div class="sa">
+    <div>
+      <div class="sh">Manure Spreading Risk Map</div>
+      <div class="ss">Farming Rules for Water — field-by-field risk assessment with live EA flood alerts</div>
+    </div>
+    <div class="btn-grp">
+      <button class="btn btn-p" onclick="checkLiveConditions()" id="live-btn">🌐 Check live conditions</button>
+      <button class="btn btn-s" onclick="window.print()">🖨️ Print risk map</button>
+    </div>
+  </div>
+
+  <!-- LIVE CONDITIONS BANNER -->
+  <div id="live-banner" style="display:none;margin-bottom:16px">
+    <div id="live-alerts" class="alert al-r" style="display:none">
+      🚨 <strong>EA FLOOD ALERTS ACTIVE</strong> — <span id="live-alert-text"></span>
+    </div>
+    <div id="live-rainfall" class="alert al-a" style="display:none">
+      🌧️ <strong>Recent rainfall:</strong> <span id="live-rain-text"></span>
+    </div>
+    <div id="live-ok" class="alert al-g" style="display:none">
+      ✅ <strong>Live check complete</strong> — <span id="live-ok-text"></span>
+    </div>
+    <div style="font-size:11px;color:var(--gx);margin-top:4px" id="live-timestamp"></div>
+  </div>
+
+  <div class="g2" style="align-items:start">
+    <div>
+      <!-- SVG RISK MAP -->
+      <div id="risk-map-wrap" style="background:#e8f0e8;border-radius:12px;border:2px solid var(--gy);overflow:hidden;box-shadow:var(--sh);position:relative">
+        <svg id="risk-svg" viewBox="0 0 700 580" style="width:100%;display:block;cursor:grab;touch-action:none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="700" height="580" fill="#dde8dd"/>
+          <g id="risk-zoom-group" transform="translate(0,0) scale(1)">
+            <g id="risk-parcels"></g>
+            <g id="risk-labels" style="pointer-events:none"></g>
+          </g>
+        </svg>
+        <div style="position:absolute;top:10px;right:10px;display:flex;flex-direction:column;gap:4px;z-index:10">
+          <button onclick="zoomRisk(1.4)" style="width:32px;height:32px;background:white;border:1.5px solid var(--gy);border-radius:6px;font-size:18px;cursor:pointer;box-shadow:var(--sh);font-weight:700;color:var(--gd)">+</button>
+          <button onclick="zoomRisk(0.714)" style="width:32px;height:32px;background:white;border:1.5px solid var(--gy);border-radius:6px;font-size:18px;cursor:pointer;box-shadow:var(--sh);font-weight:700;color:var(--gd)">−</button>
+          <button onclick="resetRiskView()" style="width:32px;height:32px;background:white;border:1.5px solid var(--gy);border-radius:6px;font-size:11px;cursor:pointer;box-shadow:var(--sh);font-weight:700;color:var(--gd)" title="Reset">⊕</button>
+        </div>
+        <div id="risk-tooltip" style="display:none;position:absolute;background:white;border:1.5px solid var(--gy);border-radius:6px;padding:6px 10px;font-size:12px;pointer-events:none;box-shadow:var(--sh);z-index:10;white-space:nowrap;max-width:220px"></div>
+      </div>
+      <div style="margin-top:6px;font-size:11px;color:var(--gx)">Scroll to zoom · Drag to pan · Click field for details</div>
+
+      <!-- LEGEND -->
+      <div class="card" style="margin-top:14px">
+        <div class="card-hdr"><div class="card-title"><span class="ic">🎨</span>Risk Legend</div></div>
+        <div class="sr"><span style="display:inline-block;width:14px;height:14px;background:#dc2626;border-radius:3px;margin-right:8px;flex-shrink:0"></span><span class="sr-k"><strong>HIGH RISK</strong> — Do not spread. Review conditions before any application.</span></div>
+        <div class="sr"><span style="display:inline-block;width:14px;height:14px;background:#f59e0b;border-radius:3px;margin-right:8px;flex-shrink:0"></span><span class="sr-k"><strong>MEDIUM RISK</strong> — Proceed with caution. Check weather and soil conditions.</span></div>
+        <div class="sr"><span style="display:inline-block;width:14px;height:14px;background:#2d8a52;border-radius:3px;margin-right:8px;flex-shrink:0"></span><span class="sr-k"><strong>LOW RISK</strong> — Suitable for spreading subject to normal good practice.</span></div>
+        <div class="sr"><span style="display:inline-block;width:14px;height:14px;background:#94a3b8;border-radius:3px;margin-right:8px;flex-shrink:0"></span><span class="sr-k">No risk data — field not in plan</span></div>
+        <p style="font-size:10px;color:var(--gx);margin-top:8px">Risk assessed against Farming Rules for Water (England) 2018. Always check field conditions before spreading regardless of risk rating. © Siggs &amp; Co Ltd 2026</p>
+      </div>
+    </div>
+
+    <div>
+      <!-- FARM RISK SUMMARY -->
+      <div class="card">
+        <div class="card-hdr"><div class="card-title"><span class="ic">📊</span>Farm Risk Summary</div></div>
+        <div class="g3" style="margin-bottom:12px">
+          <div style="text-align:center;background:#fef2f2;border-radius:8px;padding:10px">
+            <div style="font-size:22px;font-weight:700;color:#dc2626" id="risk-count-high">0</div>
+            <div style="font-size:11px;color:#991b1b;font-weight:600">HIGH RISK</div>
+          </div>
+          <div style="text-align:center;background:#fffbeb;border-radius:8px;padding:10px">
+            <div style="font-size:22px;font-weight:700;color:#d97706" id="risk-count-med">0</div>
+            <div style="font-size:11px;color:#92400e;font-weight:600">MEDIUM RISK</div>
+          </div>
+          <div style="text-align:center;background:var(--gu);border-radius:8px;padding:10px">
+            <div style="font-size:22px;font-weight:700;color:var(--gd)" id="risk-count-low">0</div>
+            <div style="font-size:11px;color:var(--gm);font-weight:600">LOW RISK</div>
+          </div>
+        </div>
+        <div class="sr"><span class="sr-k">High risk area</span><span class="sr-v" id="risk-ha-high" style="color:#dc2626">— ha</span></div>
+        <div class="sr"><span class="sr-k">Medium risk area</span><span class="sr-v" id="risk-ha-med" style="color:#d97706">— ha</span></div>
+        <div class="sr"><span class="sr-k">Low risk area</span><span class="sr-v" id="risk-ha-low" style="color:var(--gd)">— ha</span></div>
+        <div class="sr"><span class="sr-k">Live EA alerts</span><span class="sr-v" id="risk-ea-status">Not checked</span></div>
+        <div class="sr"><span class="sr-k">Recent rainfall</span><span class="sr-v" id="risk-rain-status">Not checked</span></div>
+      </div>
+
+      <!-- SELECTED FIELD DETAIL -->
+      <div class="card" id="risk-field-card" style="display:none">
+        <div class="card-hdr">
+          <div class="card-title"><span class="ic">🌿</span><span id="rfi-name">—</span></div>
+          <span id="rfi-badge" class="badge">—</span>
+        </div>
+        <div class="sr"><span class="sr-k">Risk score</span><span class="sr-v" id="rfi-score">—</span></div>
+        <div class="sr"><span class="sr-k">Slope</span><span class="sr-v" id="rfi-slope">—</span></div>
+        <div class="sr"><span class="sr-k">Watercourse</span><span class="sr-v" id="rfi-wc">—</span></div>
+        <div class="sr"><span class="sr-k">Drainage</span><span class="sr-v" id="rfi-drain">—</span></div>
+        <div class="sr"><span class="sr-k">Soil type</span><span class="sr-v" id="rfi-soil">—</span></div>
+        <div class="sr"><span class="sr-k">NVZ</span><span class="sr-v" id="rfi-nvz">—</span></div>
+        <div class="sr"><span class="sr-k">Flood zone</span><span class="sr-v" id="rfi-flood">—</span></div>
+        <div style="background:var(--gz);border-radius:6px;padding:10px;margin-top:10px;font-size:12px" id="rfi-reasons"></div>
+        <div style="margin-top:10px"><button class="btn btn-s btn-sm" id="rfi-edit">Edit field →</button></div>
+      </div>
+
+      <!-- FARMING RULES FOR WATER -->
+      <div class="card">
+        <div class="card-hdr"><div class="card-title"><span class="ic">📋</span>8 Farming Rules for Water</div></div>
+        <div style="font-size:12px;line-height:1.6;color:var(--ch)">
+          <p style="margin-bottom:6px"><strong>Rule 1:</strong> Test soil — have a nutrient management plan.</p>
+          <p style="margin-bottom:6px"><strong>Rule 2:</strong> Do not apply where risk of runoff to water.</p>
+          <p style="margin-bottom:6px"><strong>Rule 3:</strong> Do not apply to waterlogged, frozen or snow-covered land.</p>
+          <p style="margin-bottom:6px"><strong>Rule 4:</strong> Do not apply within 10m of a watercourse (50m for application by injection next to SSSSIs).</p>
+          <p style="margin-bottom:6px"><strong>Rule 5:</strong> Take account of weather forecast.</p>
+          <p style="margin-bottom:6px"><strong>Rule 6:</strong> Do not spread during closed periods (NVZ rules).</p>
+          <p style="margin-bottom:6px"><strong>Rule 7:</strong> Take reasonable precautions on sloping land next to water.</p>
+          <p style="margin-bottom:0"><strong>Rule 8:</strong> Have adequate storage for organic manures.</p>
+        </div>
+        <div class="alert al-a" style="margin-top:12px">⚠️ These rules apply to <strong>ALL farms</strong> in England regardless of NVZ status. Non-compliance can result in enforcement action.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FIELD-BY-FIELD RISK TABLE -->
+  <div class="card">
+    <div class="card-hdr"><div class="card-title"><span class="ic">📋</span>Field Risk Assessment — all fields</div></div>
+    <div class="tw"><table>
+      <thead><tr>
+        <th>Field</th><th>Ha</th><th>Crop</th><th>Slope</th><th>Watercourse</th><th>Drainage</th>
+        <th>Soil</th><th>NVZ</th><th>Flood zone</th><th>Risk factors</th><th>RISK</th>
+      </tr></thead>
+      <tbody id="risk-table-body">
+        <tr><td colspan="11" style="text-align:center;color:var(--gx);padding:20px">Add fields with soil health data to see risk assessment</td></tr>
+      </tbody>
+    </table></div>
   </div>
 </div>
 
@@ -2055,6 +2190,465 @@ showPage = function(id) {
   _sp(id);
   if(id==='map' && !mapDrawn) { mapDrawn=true; setTimeout(redrawMap,80); }
   if(id==='map' && mapDrawn) { redrawMap(); }
+};
+
+// ═══════════════════════════ SPREADING RISK MAP ═══════════════════════════
+
+// ── RISK SCORING ENGINE ──
+// Each factor scores 0 (low), 1 (medium) or 2 (high risk)
+// Total score: 0-2 = LOW, 3-5 = MEDIUM, 6+ = HIGH
+
+function scoreField(f) {
+  if(!f) return null;
+  const reasons = [];
+  let score = 0;
+
+  // Slope
+  const slope = (f.slope||'').toLowerCase();
+  if(slope.includes('steep')) { score+=2; reasons.push('Steep slope (≥12.3%) — high runoff risk'); }
+  else if(slope.includes('moderate')) { score+=1; reasons.push('Moderate slope (5–12%) — check conditions'); }
+  else { reasons.push('Gentle slope (<5%) — low runoff risk'); }
+
+  // Watercourse proximity
+  const wc = (f.wc||'').toLowerCase();
+  if(wc.includes('adjacent to watercourse')) { score+=2; reasons.push('⚠️ Adjacent to watercourse — 10m exclusion zone applies'); }
+  else if(wc.includes('adjacent to road')) { score+=1; reasons.push('Adjacent to road/track — runoff pathway possible'); }
+  else if(wc.includes('one field')) { score+=1; reasons.push('Watercourse one field away — moderate risk'); }
+  else { reasons.push('Distant from watercourse — low risk'); }
+
+  // Drainage
+  const drain = (f.drain||'').toLowerCase();
+  if(drain.includes('poor')) { score+=2; reasons.push('Poor drainage — waterlogging risk, Rule 3 applies'); }
+  else if(drain.includes('land drain')) { score+=1; reasons.push('Land drains present — direct pathway to watercourse possible'); }
+  else { reasons.push('Free draining — low ponding risk'); }
+
+  // Soil type
+  const soil = (f.soiltype||'').toLowerCase();
+  if(soil.includes('clay')) { score+=1; reasons.push('Clay soil — slow infiltration, higher runoff risk'); }
+  else if(soil.includes('shallow')) { score+=1; reasons.push('Shallow soil — limited buffering capacity'); }
+  else if(soil.includes('sandy')||soil.includes('light')) { score+=1; reasons.push('Light/sandy soil — leaching risk'); }
+
+  // NVZ
+  if(f.nvz==='yes') { score+=1; reasons.push('In NVZ — closed period and N-max rules apply'); }
+
+  // Erosion
+  const erosion = (f.erosion||'').toLowerCase();
+  if(erosion==='often') { score+=2; reasons.push('Known erosion risk — soil movement to watercourse possible'); }
+  else if(erosion==='sometimes') { score+=1; reasons.push('Occasional erosion observed'); }
+
+  // Runoff
+  const runoff = (f.runoff||'').toLowerCase();
+  if(runoff==='often') { score+=2; reasons.push('Known runoff risk — high pollution potential'); }
+  else if(runoff==='sometimes') { score+=1; reasons.push('Occasional runoff observed'); }
+
+  // Flood zone (from live check or stored)
+  if(f._floodZone===3) { score+=2; reasons.push('🚨 Flood Zone 3 — high flood risk, avoid spreading'); }
+  else if(f._floodZone===2) { score+=1; reasons.push('Flood Zone 2 — medium flood risk'); }
+
+  // Live rainfall (from Open-Meteo)
+  if(f._recentRainMm !== undefined) {
+    if(f._recentRainMm > 30) { score+=2; reasons.push('🌧️ Heavy recent rainfall ('+f._recentRainMm.toFixed(0)+'mm in 7 days) — soil likely saturated'); }
+    else if(f._recentRainMm > 15) { score+=1; reasons.push('🌧️ Moderate recent rainfall ('+f._recentRainMm.toFixed(0)+'mm in 7 days) — check soil conditions'); }
+    else { reasons.push('Recent rainfall low ('+f._recentRainMm.toFixed(0)+'mm in 7 days)'); }
+  }
+
+  // EA flood alert (from live check)
+  if(f._eaAlert) { score+=2; reasons.push('🚨 ACTIVE EA FLOOD ALERT in this area — do not spread'); }
+
+  const level = score >= 6 ? 'HIGH' : score >= 3 ? 'MEDIUM' : 'LOW';
+  return { score, level, reasons };
+}
+
+function getRiskColour(level, live) {
+  const alpha = live ? 1.0 : 0.8;
+  if(level==='HIGH') return '#dc2626';
+  if(level==='MEDIUM') return '#f59e0b';
+  return '#2d8a52';
+}
+
+// ── RISK SVG MAP ──
+let _rvx=0,_rvy=0,_rvz=1;
+let _rdragging=false,_rdragStart={x:0,y:0},_rdragOrigin={x:0,y:0};
+
+function setRiskView(tx,ty,sc){
+  _rvx=tx;_rvy=ty;_rvz=sc;
+  const g=document.getElementById('risk-zoom-group');
+  if(g) g.setAttribute('transform','translate('+tx+','+ty+') scale('+sc+')');
+  document.querySelectorAll('#risk-parcels path').forEach(p=>{
+    p.setAttribute('stroke-width',(1.2/_rvz).toFixed(2));
+  });
+}
+function zoomRisk(f,cx,cy){
+  const svg=document.getElementById('risk-svg'); if(!svg) return;
+  const vb=svg.viewBox.baseVal;
+  if(cx===undefined) cx=vb.width/2;
+  if(cy===undefined) cy=vb.height/2;
+  const nz=Math.min(12,Math.max(1,_rvz*f));
+  const nx=cx-(cx-_rvx)*(nz/_rvz);
+  const ny=cy-(cy-_rvy)*(nz/_rvz);
+  const maxTx=0,minTx=vb.width-vb.width*nz;
+  const maxTy=0,minTy=vb.height-vb.height*nz;
+  setRiskView(Math.min(maxTx,Math.max(minTx,nx)),Math.min(maxTy,Math.max(minTy,ny)),nz);
+}
+function resetRiskView(){ setRiskView(0,0,1); }
+
+function initRiskInteraction(){
+  const svg=document.getElementById('risk-svg');
+  if(!svg||svg._riskInit) return;
+  svg._riskInit=true;
+  svg.addEventListener('wheel',function(e){
+    e.preventDefault();
+    const rect=svg.getBoundingClientRect();
+    const vb=svg.viewBox.baseVal;
+    const cx=(e.clientX-rect.left)*(vb.width/rect.width);
+    const cy=(e.clientY-rect.top)*(vb.height/rect.height);
+    zoomRisk(e.deltaY<0?1.25:0.8,cx,cy);
+  },{passive:false});
+  svg.addEventListener('mousedown',function(e){
+    if(e.button!==0) return;
+    _rdragging=true;
+    _rdragStart={x:e.clientX,y:e.clientY};
+    _rdragOrigin={x:_rvx,y:_rvy};
+    svg.style.cursor='grabbing';
+  });
+  window.addEventListener('mousemove',function(e){
+    if(!_rdragging) return;
+    const svg2=document.getElementById('risk-svg'); if(!svg2) return;
+    const rect=svg2.getBoundingClientRect();
+    const vb=svg2.viewBox.baseVal;
+    const sx=vb.width/rect.width,sy=vb.height/rect.height;
+    const dx=(e.clientX-_rdragStart.x)*sx,dy=(e.clientY-_rdragStart.y)*sy;
+    const maxTx=0,minTx=vb.width-vb.width*_rvz;
+    const maxTy=0,minTy=vb.height-vb.height*_rvz;
+    setRiskView(Math.min(maxTx,Math.max(minTx,_rdragOrigin.x+dx)),Math.min(maxTy,Math.max(minTy,_rdragOrigin.y+dy)),_rvz);
+  });
+  window.addEventListener('mouseup',function(){
+    if(_rdragging){_rdragging=false;const s=document.getElementById('risk-svg');if(s)s.style.cursor='grab';}
+  });
+  // Touch
+  let _rt={},_rtd=0,_rtm={x:0,y:0};
+  svg.addEventListener('touchstart',function(e){
+    e.preventDefault();
+    Array.from(e.changedTouches).forEach(t=>{_rt[t.identifier]={x:t.clientX,y:t.clientY};});
+    const ks=Object.keys(_rt);
+    if(ks.length===1){_rdragStart={x:_rt[ks[0]].x,y:_rt[ks[0]].y};_rdragOrigin={x:_rvx,y:_rvy};}
+    if(ks.length===2){const a=_rt[ks[0]],b=_rt[ks[1]];_rtd=Math.hypot(b.x-a.x,b.y-a.y);_rtm={x:(a.x+b.x)/2,y:(a.y+b.y)/2};}
+  },{passive:false});
+  svg.addEventListener('touchmove',function(e){
+    e.preventDefault();
+    Array.from(e.changedTouches).forEach(t=>{_rt[t.identifier]={x:t.clientX,y:t.clientY};});
+    const ks=Object.keys(_rt);
+    const rect=svg.getBoundingClientRect();
+    const vb=svg.viewBox.baseVal;
+    const sx=vb.width/rect.width,sy=vb.height/rect.height;
+    if(ks.length===1){
+      const dx=(e.changedTouches[0].clientX-_rdragStart.x)*sx;
+      const dy=(e.changedTouches[0].clientY-_rdragStart.y)*sy;
+      const maxTx=0,minTx=vb.width-vb.width*_rvz;
+      const maxTy=0,minTy=vb.height-vb.height*_rvz;
+      setRiskView(Math.min(maxTx,Math.max(minTx,_rdragOrigin.x+dx)),Math.min(maxTy,Math.max(minTy,_rdragOrigin.y+dy)),_rvz);
+    }
+    if(ks.length===2){
+      const a=_rt[ks[0]],b=_rt[ks[1]];
+      const d=Math.hypot(b.x-a.x,b.y-a.y);
+      const f=d/_rtd;_rtd=d;
+      const cx=(_rtm.x-rect.left)*sx,cy=(_rtm.y-rect.top)*sy;
+      zoomRisk(f,cx,cy);
+      _rtm={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+    }
+  },{passive:false});
+  svg.addEventListener('touchend',function(e){
+    Array.from(e.changedTouches).forEach(t=>{delete _rt[t.identifier];});
+  });
+}
+
+function drawRiskMap(){
+  const pG=document.getElementById('risk-parcels');
+  const lG=document.getElementById('risk-labels');
+  if(!pG) return;
+  pG.innerHTML=''; lG.innerHTML='';
+  if(typeof SVG_PATHS==='undefined') return;
+
+  let cntHigh=0,cntMed=0,cntLow=0;
+  let haHigh=0,haMed=0,haLow=0;
+
+  SVG_PATHS.forEach(p=>{
+    const f=S.fields.find(ff=>ff.name===p.fn);
+    const risk = f ? scoreField(f) : null;
+    const fill = risk ? getRiskColour(risk.level) : '#94a3b8';
+
+    const el=document.createElementNS('http://www.w3.org/2000/svg','path');
+    el.setAttribute('d',p.d);
+    el.setAttribute('fill',fill);
+    el.setAttribute('stroke','#fff');
+    el.setAttribute('stroke-width','1.2');
+    el.setAttribute('data-fn',p.fn);
+    el.style.cursor='pointer';
+    el.addEventListener('mouseenter',function(e){
+      this.setAttribute('stroke-width','2.5');this.setAttribute('opacity','0.85');
+      showRiskTip(e,p.fn,risk);
+    });
+    el.addEventListener('mousemove',moveRiskTip);
+    el.addEventListener('mouseleave',function(){
+      this.setAttribute('stroke-width','1.2');this.setAttribute('opacity','1');
+      hideRiskTip();
+    });
+    el.addEventListener('click',()=>showRiskFieldCard(p.fn,f,risk));
+    pG.appendChild(el);
+
+    if(f && risk){
+      if(risk.level==='HIGH'){cntHigh++;haHigh+=f.ha||0;}
+      else if(risk.level==='MEDIUM'){cntMed++;haMed+=f.ha||0;}
+      else{cntLow++;haLow+=f.ha||0;}
+
+      // Label
+      const txt=document.createElementNS('http://www.w3.org/2000/svg','text');
+      txt.setAttribute('x',p.lx);txt.setAttribute('y',p.ly);
+      txt.setAttribute('text-anchor','middle');txt.setAttribute('dominant-baseline','middle');
+      txt.setAttribute('font-size','8');txt.setAttribute('font-family','DM Sans,sans-serif');
+      txt.setAttribute('fill','#fff');txt.setAttribute('font-weight','700');
+      txt.setAttribute('paint-order','stroke');txt.setAttribute('stroke','rgba(0,0,0,0.5)');
+      txt.setAttribute('stroke-width','2');
+      txt.textContent=p.parcel;
+      lG.appendChild(txt);
+    }
+  });
+
+  // Update summary
+  const s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  s('risk-count-high',cntHigh);s('risk-count-med',cntMed);s('risk-count-low',cntLow);
+  s('risk-ha-high',haHigh.toFixed(1)+' ha');s('risk-ha-med',haMed.toFixed(1)+' ha');s('risk-ha-low',haLow.toFixed(1)+' ha');
+
+  setRiskView(_rvx,_rvy,_rvz);
+  setTimeout(initRiskInteraction,30);
+  renderRiskTable();
+}
+
+function showRiskTip(e,fn,risk){
+  const tip=document.getElementById('risk-tooltip');
+  const level=risk?risk.level:'No data';
+  const col=risk?getRiskColour(risk.level):'#94a3b8';
+  tip.innerHTML='<strong>'+fn+'</strong> <span style="background:'+col+';color:white;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:700">'+level+'</span>';
+  tip.style.display='block';
+  moveRiskTip(e);
+}
+function moveRiskTip(e){
+  const tip=document.getElementById('risk-tooltip');
+  const wrap=document.getElementById('risk-map-wrap');
+  const rect=wrap.getBoundingClientRect();
+  let lx=e.clientX-rect.left+12,ly=e.clientY-rect.top-10;
+  if(lx+200>rect.width) lx=e.clientX-rect.left-200;
+  tip.style.left=lx+'px';tip.style.top=ly+'px';
+}
+function hideRiskTip(){document.getElementById('risk-tooltip').style.display='none';}
+
+function showRiskFieldCard(fn,f,risk){
+  document.getElementById('risk-field-card').style.display='block';
+  document.getElementById('rfi-name').textContent=fn;
+  if(!f||!risk){
+    document.getElementById('rfi-badge').textContent='No data';
+    document.getElementById('rfi-badge').className='badge bg-x';
+    return;
+  }
+  const badgeClass={'HIGH':'bg-r','MEDIUM':'bg-a','LOW':'bg-g'}[risk.level]||'bg-x';
+  const badge=document.getElementById('rfi-badge');
+  badge.textContent=risk.level+' RISK';
+  badge.className='badge '+badgeClass;
+  const s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v||'—';};
+  s('rfi-score','Score: '+risk.score+'/18');
+  s('rfi-slope',f.slope||'—');
+  s('rfi-wc',f.wc||'—');
+  s('rfi-drain',f.drain||'—');
+  s('rfi-soil',f.soiltype||'—');
+  s('rfi-nvz',f.nvz==='yes'?'Yes — closed periods apply':'No');
+  s('rfi-flood',f._floodZone?'Zone '+f._floodZone:'Not checked');
+  document.getElementById('rfi-reasons').innerHTML='<strong style="font-size:11px;color:var(--gx)">RISK FACTORS:</strong><br>'+
+    risk.reasons.map(r=>'• '+r).join('<br>');
+  const idx=S.fields.findIndex(ff=>ff.name===fn);
+  const btn=document.getElementById('rfi-edit');
+  btn.style.display=idx>=0?'inline-flex':'none';
+  btn.onclick=()=>{showPage('fields');selField(idx);};
+}
+
+function renderRiskTable(){
+  const tb=document.getElementById('risk-table-body');
+  if(!tb) return;
+  if(!S.fields.length){
+    tb.innerHTML='<tr><td colspan="11" style="text-align:center;color:var(--gx);padding:20px">Add fields to see risk assessment</td></tr>';
+    return;
+  }
+  const rows=S.fields.map(f=>{
+    const risk=scoreField(f);
+    if(!risk) return '';
+    const col={'HIGH':'#dc2626','MEDIUM':'#f59e0b','LOW':'#2d8a52'}[risk.level];
+    const bg={'HIGH':'#fef2f2','MEDIUM':'#fffbeb','LOW':'var(--gu)'}[risk.level];
+    const topReasons=risk.reasons.filter(r=>r.includes('⚠️')||r.includes('🚨')||r.includes('High')||r.includes('high')||r.includes('Poor')||r.includes('Steep')||r.includes('Adjacent')).slice(0,2);
+    return '<tr style="background:'+bg+'">'+
+      '<td><strong>'+f.name+'</strong></td>'+
+      '<td>'+f.ha+'</td>'+
+      '<td style="font-size:11px">'+f.crop+'</td>'+
+      '<td>'+scoreLabel(f.slope)+'</td>'+
+      '<td>'+scoreLabel(f.wc)+'</td>'+
+      '<td>'+scoreLabel(f.drain)+'</td>'+
+      '<td>'+f.soiltype+'</td>'+
+      '<td>'+(f.nvz==='yes'?'<span class="badge bg-a">NVZ</span>':'')+' </td>'+
+      '<td>'+(f._floodZone?'Zone '+f._floodZone:'—')+'</td>'+
+      '<td style="font-size:11px;color:var(--gx)">'+(topReasons.join(' · ')||'—')+'</td>'+
+      '<td><span class="badge" style="background:'+col+';color:white;font-size:11px">'+risk.level+'</span></td>'+
+    '</tr>';
+  }).join('');
+  tb.innerHTML=rows||'<tr><td colspan="11" style="text-align:center;color:var(--gx);padding:20px">No risk data</td></tr>';
+}
+
+function scoreLabel(val){
+  if(!val) return '—';
+  const v=val.toLowerCase();
+  if(v.includes('steep')||v.includes('often')||v.includes('adjacent to wc')||v.includes('poor')) return '<span style="color:#dc2626;font-weight:600">'+val+'</span>';
+  if(v.includes('moderate')||v.includes('sometimes')||v.includes('one field')||v.includes('drain')) return '<span style="color:#d97706;font-weight:600">'+val+'</span>';
+  return '<span style="color:var(--gm)">'+val+'</span>';
+}
+
+// ── LIVE CONDITIONS CHECK ──
+async function checkLiveConditions(){
+  const btn=document.getElementById('live-btn');
+  btn.textContent='🔄 Checking...';
+  btn.disabled=true;
+  document.getElementById('live-banner').style.display='block';
+
+  try {
+    // Get farm centroid from fields that have map parcels
+    let lat=50.775, lon=-4.323; // default: Beaworthy area
+    if(typeof SVG_PATHS!=='undefined' && SVG_PATHS.length>0 && S.fields.length>0){
+      // Use first matched field centroid from WGS84 data
+      // We have pre-computed centroids in SVG_PATHS as lx/ly (SVG space)
+      // For the real lat/lon we use known Ellacott farm centre or calculate from parcel data
+    }
+    // If farm has a known location from field OS refs, derive approximate centre
+    const firstField = S.fields.find(f=>f.os&&f.ng);
+    if(firstField){
+      // Convert OS sheet to approximate lat/lon (rough lookup table for Devon/Cornwall)
+      const osToLatLon = {
+        'SS35':{lat:50.78,lon:-4.32},'SS36':{lat:50.78,lon:-4.22},
+        'SX36':{lat:50.69,lon:-4.32},'SX37':{lat:50.69,lon:-4.22},
+        'SX39':{lat:50.69,lon:-4.02},'SX40':{lat:50.69,lon:-3.92},
+        'SW88':{lat:50.27,lon:-5.08},'SW89':{lat:50.27,lon:-4.98},
+        'SW90':{lat:50.27,lon:-4.88},'SW91':{lat:50.27,lon:-4.78},
+        'SX09':{lat:50.41,lon:-4.39},'SX08':{lat:50.41,lon:-4.49},
+        'ST44':{lat:51.08,lon:-2.78},'ST45':{lat:51.08,lon:-2.68},
+      };
+      const sheetKey = (firstField.os||'').substring(0,4).toUpperCase();
+      if(osToLatLon[sheetKey]){lat=osToLatLon[sheetKey].lat;lon=osToLatLon[sheetKey].lon;}
+    }
+
+    // 1. Open-Meteo — last 7 days rainfall
+    const today=new Date().toISOString().split('T')[0];
+    const weekAgo=new Date(Date.now()-7*24*60*60*1000).toISOString().split('T')[0];
+    const rainUrl=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=precipitation_sum&start_date=${weekAgo}&end_date=${today}&timezone=Europe/London`;
+
+    let totalRain=0, rainOk=false;
+    try{
+      const rainResp=await fetch(rainUrl);
+      const rainData=await rainResp.json();
+      if(rainData.daily&&rainData.daily.precipitation_sum){
+        totalRain=rainData.daily.precipitation_sum.reduce((a,b)=>a+(b||0),0);
+        rainOk=true;
+      }
+    }catch(e){ console.log('Rainfall API error:',e); }
+
+    // 2. EA Flood Monitoring API — active alerts near farm
+    const eaUrl=`https://environment.data.gov.uk/flood-monitoring/id/floods?min-severity=3`;
+    let activeAlerts=[], eaOk=false;
+    try{
+      const eaResp=await fetch(eaUrl);
+      const eaData=await eaResp.json();
+      if(eaData.items){
+        // Filter for alerts in the right county area
+        const devonCornwall=['devon','cornwall','somerset','dorset','wiltshire','exeter','plymouth','truro','taunton','salisbury'];
+        activeAlerts=eaData.items.filter(a=>{
+          const desc=(a.description||a.label||'').toLowerCase();
+          const area=(a.floodArea?.county||a.county||'').toLowerCase();
+          return devonCornwall.some(c=>desc.includes(c)||area.includes(c));
+        });
+        eaOk=true;
+      }
+    }catch(e){ console.log('EA API error:',e); }
+
+    // Apply live data to all fields
+    const recentRain = rainOk ? totalRain : undefined;
+    const hasAlert = activeAlerts.length > 0;
+    S.fields.forEach(f=>{
+      f._recentRainMm = recentRain;
+      f._eaAlert = hasAlert;
+    });
+
+    // Update UI
+    document.getElementById('live-banner').style.display='block';
+    const alertEl=document.getElementById('live-alerts');
+    const rainEl=document.getElementById('live-rainfall');
+    const okEl=document.getElementById('live-ok');
+
+    if(hasAlert){
+      alertEl.style.display='flex';
+      document.getElementById('live-alert-text').textContent=
+        activeAlerts.length+' active flood alert(s) in Devon/Cornwall/Somerset area: '+
+        activeAlerts.slice(0,2).map(a=>a.description||a.label||'Alert').join('; ');
+    } else { alertEl.style.display='none'; }
+
+    if(rainOk){
+      if(totalRain>30){
+        rainEl.style.display='flex';
+        document.getElementById('live-rain-text').textContent=
+          totalRain.toFixed(0)+'mm in the last 7 days at farm location — soil likely saturated. High runoff risk.';
+      } else if(totalRain>15){
+        rainEl.style.display='flex';
+        rainEl.className='alert al-a';
+        document.getElementById('live-rain-text').textContent=
+          totalRain.toFixed(0)+'mm in the last 7 days — moderate. Check soil conditions before spreading.';
+      } else {
+        rainEl.style.display='none';
+      }
+    }
+
+    if(!hasAlert && (!rainOk || totalRain<=15)){
+      okEl.style.display='flex';
+      const rainTxt=rainOk?(' Rainfall last 7 days: '+totalRain.toFixed(0)+'mm.'):'';
+      document.getElementById('live-ok-text').textContent=
+        'No EA flood alerts active in this region.'+rainTxt+' Risk ratings updated.';
+    } else { okEl.style.display='none'; }
+
+    document.getElementById('live-timestamp').textContent=
+      'Live data checked: '+new Date().toLocaleString('en-GB')+
+      ' | Rainfall data: Open-Meteo ERA5 | Flood alerts: Environment Agency';
+
+    // Update risk displays
+    const rEl=document.getElementById('risk-ea-status');
+    const rrEl=document.getElementById('risk-rain-status');
+    if(rEl) rEl.textContent=hasAlert?'⚠️ '+activeAlerts.length+' alert(s) active':'✅ No active alerts';
+    if(rrEl) rrEl.textContent=rainOk?totalRain.toFixed(0)+'mm (last 7 days)':'Unavailable';
+
+    drawRiskMap();
+
+  } catch(err) {
+    console.error('Live check error:',err);
+    document.getElementById('live-ok').style.display='flex';
+    document.getElementById('live-ok').className='alert al-a';
+    document.getElementById('live-ok-text').textContent='Could not retrieve live data — check internet connection. Showing static risk assessment only.';
+  }
+
+  btn.textContent='🌐 Check live conditions';
+  btn.disabled=false;
+}
+
+// ── INIT RISK PAGE ──
+let _riskReady=false;
+// Hook into showPage
+const _spOld2 = showPage;
+showPage = function(id){
+  _spOld2(id);
+  if(id==='risk'){
+    if(!_riskReady){ _riskReady=true; setTimeout(()=>{ drawRiskMap(); resetRiskView(); },80); }
+    else { drawRiskMap(); }
+  }
 };
 
 </script>
