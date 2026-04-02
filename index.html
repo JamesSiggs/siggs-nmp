@@ -151,7 +151,37 @@ tbody td{padding:9px 11px;vertical-align:middle}
 .leaflet-tooltip.map-tip { white-space:nowrap; }
 
 /* PRINT */
-@media print{nav,.btn,.btn-grp,header .hdr-right{display:none!important}.card{box-shadow:none;border:1px solid #ddd}body{background:#fff;font-size:11px}}
+@media print{
+  /* Hide interactive elements */
+  nav,.btn,.btn-grp,header .hdr-right,.fab-btn,#nmp-toast,
+  button:not(.print-show),.modal-overlay,.alert.no-print{display:none!important}
+  /* Reset layout for print */
+  body{background:#fff;font-size:10pt;color:#000;margin:0}
+  header{position:static;border-bottom:2px solid #1a5c35;box-shadow:none;padding:8px 16px}
+  .logo-text .brand{font-size:16pt}
+  .main{max-width:100%;padding:8px}
+  .page{display:block!important}
+  .page:not(.active){display:none!important}
+  .card{box-shadow:none!important;border:1px solid #ccc;page-break-inside:avoid;margin-bottom:10px;padding:10px}
+  .card-title{font-size:11pt}
+  /* Print header watermark */
+  .main::before{
+    content:'SIGGS & CO LTD — NUTRIENT MANAGEMENT PLAN — STRICTLY CONFIDENTIAL';
+    display:block;font-size:7pt;color:#888;text-align:center;
+    border-bottom:1px solid #eee;padding-bottom:4px;margin-bottom:8px;letter-spacing:1px
+  }
+  /* Print footer */
+  .main::after{
+    content:'RB209 2026 (AHDB, March 2026) · This plan does not constitute a fertiliser recommendation · Records must be kept for 5 years · © Siggs & Co Ltd 2026 · FE/6620';
+    display:block;font-size:7pt;color:#888;text-align:center;
+    border-top:1px solid #eee;padding-top:4px;margin-top:8px
+  }
+  table{font-size:8pt}
+  th,td{padding:3px 6px}
+  .g2,.g3,.g4{grid-template-columns:1fr 1fr}
+  .stat{border:1px solid #ddd}
+  @page{margin:15mm;size:A4}
+}
 </style>
 </head>
 <body>
@@ -164,7 +194,10 @@ tbody td{padding:9px 11px;vertical-align:middle}
     </div>
   </div>
   <div class="hdr-right">
-    <button class="btn btn-sm" onclick="loadEllacottDemo()" style="background:#8bc53f;color:#1a5c35;font-weight:700;border:none">🌿 Load Demo</button>
+    <button class="btn btn-sm" onclick="loadEllacottDemo()" style="background:#8bc53f;color:#1a5c35;font-weight:700;border:none">🌿 Demo</button>
+    <button class="btn btn-sm" onclick="exportData()" title="Download JSON backup" style="background:#e8f5e9;color:#1a5c35;border:1.5px solid #8bc53f">⬇️ Export</button>
+    <button class="btn btn-sm" onclick="document.getElementById('importFile').click()" title="Restore from JSON backup" style="background:#e8f5e9;color:#1a5c35;border:1.5px solid #8bc53f">⬆️ Import</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
     <span id="hdrFarm" style="color:var(--gx)">No farm selected</span>
     <button class="btn btn-s btn-sm" onclick="showPage('farm')">⬡ Farm Setup</button>
   </div>
@@ -306,7 +339,21 @@ tbody td{padding:9px 11px;vertical-align:middle}
           </div>
 
           <div class="fr">
-            <div class="fg"><label>Previous Crop</label><select id="fd-prev"><option>Grass (perm)</option><option>Grass (long ley 3+yr)</option><option>Grass (short ley 1-2yr)</option><option>W Wheat</option><option>W Barley</option><option>OSR</option><option>Maize</option><option>Beans/Peas</option><option>Potatoes</option><option>Brassicas</option><option>Sugar Beet</option></select></div>
+            <div class="fg"><label>Previous Crop</label><select id="fd-prev" onchange="calcRB()">
+              <optgroup label="Grass/Ley">
+                <option>Grass (perm)</option>
+                <option>Grass (long ley 3+yr)</option>
+                <option>Grass (short ley 1-2yr)</option>
+              </optgroup>
+              <optgroup label="Arable">
+                <option>W Wheat</option><option>W Barley</option><option>OSR</option><option>Maize</option><option>Beans/Peas</option><option>Potatoes</option><option>Brassicas</option><option>Sugar Beet</option>
+              </optgroup>
+              <optgroup label="Cover Crops (RB209 2026)">
+                <option value="Cover crop — non-legume, destroyed by end Feb">Cover crop — non-legume, destroyed by end Feb (+SNS1)</option>
+                <option value="Cover crop — non-legume, destroyed March+">Cover crop — non-legume, destroyed March+ (no SNS adj)</option>
+                <option value="Cover crop — legume (clover/vetch)">Cover crop — legume/clover/vetch (treat as Beans/Peas)</option>
+              </optgroup>
+            </select></div>
             <div class="fg"><label>Soil Type</label><select id="fd-soiltype" onchange="calcRB()"><option>Medium</option><option>Heavy Clay</option><option>Light/Sandy</option><option>Shallow</option><option>Deep Clay</option><option>Peat</option></select></div>
           </div>
           <div class="fr">
@@ -317,6 +364,39 @@ tbody td{padding:9px 11px;vertical-align:middle}
         </div>
 
         <div class="tp" id="ft-soil">
+          <!-- AI SOIL READER -->
+          <div style="background:linear-gradient(135deg,#e8f5e9,#f0f8f3);border:1.5px solid #8bc53f;border-radius:10px;padding:14px;margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+              <span style="font-size:20px">📸</span>
+              <div>
+                <div style="font-weight:600;color:#1a5c35;font-size:13px">Read soil data from report or map</div>
+                <div style="font-size:11px;color:#6b7280">Upload or paste any screenshot, PDF page, scan or photo — Soil Benchmark, lab reports, field sheets</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-p" onclick="document.getElementById('soilImgFile').click()" style="font-size:12px">📁 Upload image / PDF</button>
+              <button class="btn btn-s" onclick="soilReaderPaste()" style="font-size:12px">📋 Paste from clipboard</button>
+            </div>
+            <input type="file" id="soilImgFile" accept="image/*,.pdf" style="display:none" onchange="soilReaderFile(event)">
+          </div>
+          <!-- SOIL READER REVIEW PANEL (hidden until AI responds) -->
+          <div id="soil-review-panel" style="display:none;background:#fff;border:2px solid #1a5c35;border-radius:10px;padding:16px;margin-bottom:16px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <div style="font-weight:700;color:#1a5c35;font-size:13px">✅ AI extracted the following — tick to apply</div>
+              <button onclick="document.getElementById('soil-review-panel').style.display='none'" style="background:none;border:none;font-size:18px;cursor:pointer;color:#6b7280">×</button>
+            </div>
+            <div id="soil-review-items" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+            <div id="soil-review-note" style="font-size:11px;color:#6b7280;margin-bottom:12px;padding:8px;background:#f9fafb;border-radius:6px;line-height:1.5"></div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-p" onclick="soilReaderApply()" style="font-size:12px">Apply selected values</button>
+              <button class="btn btn-s" onclick="document.getElementById('soil-review-panel').style.display='none'" style="font-size:12px">Cancel</button>
+            </div>
+          </div>
+          <div id="soil-reader-loading" style="display:none;text-align:center;padding:20px;color:#1a5c35;font-size:13px">
+            <div style="font-size:24px;margin-bottom:8px">🔍</div>
+            Reading soil data from image...
+          </div>
+
           <div class="fr"><div class="fg"><label>Test Date</label><input id="fd-tdate" type="date"></div><div class="fg"><label>Lab / Ref</label><input id="fd-lab" placeholder="NRM / Cawood ref"></div></div>
           <div class="fr"><div class="fg"><label>pH</label><input id="fd-ph" type="number" placeholder="6.2" step="0.1" oninput="calcRB()"></div><div class="fg"><label>Lime req. (t/ha)</label><input id="fd-lime" type="number" step="0.5"></div></div>
           <div class="fr">
@@ -492,7 +572,7 @@ tbody td{padding:9px 11px;vertical-align:middle}
         <span onclick="document.getElementById('mp-form').style.display='none'" style="cursor:pointer;font-size:18px;color:var(--gx)">✕</span>
       </div>
       <div class="fr">
-        <div class="fg"><label>Field</label><select id="mp-field"><option value="">Select field...</option></select></div>
+        <div class="fg"><label>Field</label><select id="mp-field" onchange="autoFillMPArea()"><option value="">Select field...</option></select></div>
         <div class="fg"><label>Manure Type</label>
           <select id="mp-type" onchange="calcMPNutrients()">
             <option>FYM Cattle Fresh</option><option>FYM Cattle Old</option>
@@ -676,7 +756,7 @@ tbody td{padding:9px 11px;vertical-align:middle}
     <div class="rec-entry">
       <h3 id="rec-title">📝 Record Application <span onclick="closeRecModal()" style="cursor:pointer;font-size:18px;color:var(--gx)">✕</span></h3>
       <div class="fr">
-        <div class="fg"><label>Field</label><select id="rec-field"><option value="">Select field...</option></select></div>
+        <div class="fg"><label>Field</label><select id="rec-field" onchange="autoFillArea()"><option value="">Select field...</option></select></div>
         <div class="fg"><label>Date</label><input id="rec-date" type="date"></div>
       </div>
       <div class="fr">
@@ -969,6 +1049,53 @@ let S = { farm:{}, fields:[], livestock:[], imports:[], records:[], manurePlan:[
 try{ const d=localStorage.getItem('siggsNMP_v2'); if(d){ S=JSON.parse(d); renderAll(); } }catch(e){}
 function save(){ try{ localStorage.setItem('siggsNMP_v2',JSON.stringify(S)); }catch(e){} }
 
+// ═══════════════════════════ EXPORT / IMPORT ═══════════════════════════
+function exportData(){
+  const farm = S.farm.farmName || S.farm.name || 'NMP';
+  const date = new Date().toISOString().slice(0,10);
+  const filename = `${farm.replace(/[^a-z0-9]/gi,'_')}_NMP_${date}.json`;
+  const blob = new Blob([JSON.stringify(S,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=filename; a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ Data exported to ' + filename);
+}
+function importData(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = JSON.parse(e.target.result);
+      // Basic validation
+      if(!data||typeof data!=='object'||!('farm' in data)){
+        showToast('❌ Invalid file — not a Siggs NMP backup','err'); return;
+      }
+      if(!confirm('This will REPLACE all current data with the backup. Continue?')) return;
+      S = data;
+      save();
+      renderAll();
+      showToast('✅ Data restored from ' + file.name);
+    }catch(err){
+      showToast('❌ Could not read file: ' + err.message,'err');
+    }
+    evt.target.value=''; // reset so same file can be re-imported
+  };
+  reader.readAsText(file);
+}
+function showToast(msg, type){
+  let t = document.getElementById('nmp-toast');
+  if(!t){ t=document.createElement('div'); t.id='nmp-toast';
+    t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a5c35;color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.3);transition:opacity .3s';
+    document.body.appendChild(t);
+  }
+  t.style.background = type==='err'?'#dc2626':'#1a5c35';
+  t.textContent=msg; t.style.opacity=1;
+  clearTimeout(t._timer);
+  t._timer=setTimeout(()=>{ t.style.opacity=0; },3500);
+}
+
 // ═══════════════════════════ NAV ═══════════════════════════
 function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -1139,6 +1266,200 @@ const RB209={
   'CSAM3 — Herbal ley':()=>({n:40,p:25,k:40,mg:0,s:0,nmax:40,sfi:'CSAM3',sfiRate:382,sfiNote:'Max 40 kg inorganic N/ha. No digestate. No pesticides (except spot treatment). £382/ha/yr.'}),
 };
 function getSNS(crop,prev,rain,soil){
+  if(crop&&(crop.includes('Grass')||crop.includes('Clover')||crop.includes('CLIG3')||crop.includes('CNUM2')||crop.includes('CSAM3')||crop.includes('GS2')||crop.includes('GS4'))) return 0;
+  if(prev&&prev.includes('long ley')) return 3;
+  if(prev&&(prev.includes('Grass')||prev.includes('Beans'))) return 2;
+  if(prev&&prev.includes('Potatoes')) return 1;
+  // RB209 2026 — Cover crop SNS adjustments
+  if(prev&&prev.includes('non-legume, destroyed by end Feb')) return Math.min(3,(getSNSBase(crop,prev,rain,soil)||0)+1);
+  if(prev&&prev.includes('non-legume, destroyed March+')) return 1; // no adjustment — N release unpredictable
+  if(prev&&prev.includes('legume')) return 2; // treat as legume previous crop
+  if(soil&&soil.includes('Light')&&parseInt(rain||0)>700) return 0;
+  return 1;
+}
+// ═══════════════════════════ AI SOIL READER ═══════════════════════════
+// Accepted field mappings for review panel
+const SOIL_FIELDS = {
+  soiltype:  { label:'Soil Type',        id:'fd-soiltype',  type:'select', opts:['Medium','Heavy Clay','Light/Sandy','Shallow','Deep Clay','Peat'] },
+  slope:     { label:'Slope',            id:'fd-slope',     type:'select', opts:['Gentle <5%','Moderate 5–12%','Steep ≥12.3%'] },
+  drain:     { label:'Drainage',         id:'fd-drain',     type:'select', opts:['Free draining','Land drains present','Poor draining'] },
+  runoff:    { label:'Runoff risk',      id:'fd-runoff',    type:'select', opts:['Rare','Sometimes','Often'] },
+  ph:        { label:'pH',               id:'fd-ph',        type:'number' },
+  pmgl:      { label:'P (mg/l)',         id:'fd-pmgl',      type:'number' },
+  kmgl:      { label:'K (mg/l)',         id:'fd-kmgl',      type:'number' },
+  mgmgl:     { label:'Mg (mg/l)',        id:'fd-mgmgl',     type:'number' },
+  om:        { label:'Organic Matter %', id:'fd-om',        type:'number' },
+  lab:       { label:'Lab / Reference',  id:'fd-lab',       type:'text'   },
+  tdate:     { label:'Test Date',        id:'fd-tdate',     type:'text'   },
+};
+
+let _soilExtracted = {}; // store last AI response for apply step
+
+async function soilReaderFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const b64 = await fileToBase64(file);
+  const mime = file.type || 'image/png';
+  await soilReaderAnalyse(b64, mime);
+  evt.target.value='';
+}
+
+async function soilReaderPaste(){
+  try {
+    const items = await navigator.clipboard.read();
+    for(const item of items){
+      const imgType = item.types.find(t=>t.startsWith('image/'));
+      if(imgType){
+        const blob = await item.getType(imgType);
+        const b64 = await blobToBase64(blob);
+        await soilReaderAnalyse(b64, imgType);
+        return;
+      }
+    }
+    showToast('❌ No image found on clipboard — copy an image first','err');
+  } catch(e) {
+    showToast('❌ Clipboard access denied — try uploading instead','err');
+  }
+}
+
+function fileToBase64(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result.split(',')[1]);
+    r.onerror=rej;
+    r.readAsDataURL(file);
+  });
+}
+function blobToBase64(blob){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result.split(',')[1]);
+    r.onerror=rej;
+    r.readAsDataURL(blob);
+  });
+}
+
+async function soilReaderAnalyse(b64, mimeType){
+  const fieldName = v('fd-name') || 'this field';
+  document.getElementById('soil-reader-loading').style.display='block';
+  document.getElementById('soil-review-panel').style.display='none';
+
+  const prompt = `You are reading a soil report, soil map screenshot, or field data sheet for a farm in Devon/Cornwall, UK.
+
+Extract any of the following data you can see in the image. Only include values you are confident about — do not guess.
+
+Return ONLY valid JSON in this exact format (omit any field you cannot find):
+{
+  "soiltype": "one of: Medium | Heavy Clay | Light/Sandy | Shallow | Deep Clay | Peat",
+  "slope": "one of: Gentle <5% | Moderate 5–12% | Steep ≥12.3%",
+  "drain": "one of: Free draining | Land drains present | Poor draining",
+  "runoff": "one of: Rare | Sometimes | Often",
+  "ph": <number>,
+  "pmgl": <number>,
+  "kmgl": <number>,
+  "mgmgl": <number>,
+  "om": <number>,
+  "lab": "<lab name or report reference>",
+  "tdate": "<date in YYYY-MM-DD format if visible>",
+  "note": "<brief plain-English summary of what you found and any caveats, max 2 sentences>"
+}
+
+Field being planned: ${fieldName}
+Image source may be: Soil Benchmark map, NRM/Cawood/Eurofins lab report, scanned paper form, or photograph.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:800,
+        messages:[{
+          role:'user',
+          content:[
+            { type:'image', source:{ type:'base64', media_type:mimeType, data:b64 }},
+            { type:'text', text:prompt }
+          ]
+        }]
+      })
+    });
+    const data = await resp.json();
+    const raw = data.content?.[0]?.text || '';
+    // Extract JSON from response
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if(!jsonMatch) throw new Error('No JSON in response');
+    const extracted = JSON.parse(jsonMatch[0]);
+    _soilExtracted = extracted;
+    soilReaderShowReview(extracted);
+  } catch(e) {
+    showToast('❌ Could not read image: '+e.message,'err');
+  } finally {
+    document.getElementById('soil-reader-loading').style.display='none';
+  }
+}
+
+function soilReaderShowReview(data){
+  const panel = document.getElementById('soil-review-panel');
+  const items = document.getElementById('soil-review-items');
+  const note  = document.getElementById('soil-review-note');
+  items.innerHTML='';
+
+  let count=0;
+  for(const [key, def] of Object.entries(SOIL_FIELDS)){
+    const val = data[key];
+    if(val===undefined||val===null||val==='') continue;
+    // For selects, check value is a valid option
+    if(def.type==='select'){
+      const match = def.opts.find(o=>o.toLowerCase()===String(val).toLowerCase());
+      if(!match) continue;
+    }
+    count++;
+    const row = document.createElement('label');
+    row.style.cssText='display:flex;align-items:center;gap:10px;padding:8px 10px;background:#f9fafb;border-radius:6px;cursor:pointer;border:1px solid #e5e7eb';
+    row.innerHTML=`
+      <input type="checkbox" data-key="${key}" checked style="width:16px;height:16px;accent-color:#1a5c35">
+      <span style="font-size:12px;color:#6b7280;min-width:120px">${def.label}</span>
+      <span style="font-size:13px;font-weight:600;color:#1a5c35">${val}</span>`;
+    items.appendChild(row);
+  }
+  if(count===0){
+    items.innerHTML='<div style="color:#dc2626;font-size:12px;padding:8px">Could not extract any recognised soil data from this image. Try a clearer screenshot or a different image.</div>';
+  }
+  note.textContent = data.note || '';
+  panel.style.display='block';
+}
+
+function soilReaderApply(){
+  const checks = document.querySelectorAll('#soil-review-items input[type=checkbox]');
+  let applied=0;
+  checks.forEach(cb=>{
+    if(!cb.checked) return;
+    const key = cb.dataset.key;
+    const def = SOIL_FIELDS[key];
+    const val = _soilExtracted[key];
+    if(!def||val===undefined) return;
+    const el = document.getElementById(def.id);
+    if(!el) return;
+    if(def.type==='select'){
+      // Find closest matching option
+      const match = def.opts.find(o=>o.toLowerCase()===String(val).toLowerCase());
+      if(match){ el.value=match; applied++; }
+    } else {
+      el.value = val;
+      // Trigger recalc if it's a soil analysis field
+      if(key==='ph') calcRB();
+      if(key==='pmgl') pIdx();
+      if(key==='kmgl') kIdx();
+      if(key==='mgmgl') mgIdx();
+      applied++;
+    }
+  });
+  document.getElementById('soil-review-panel').style.display='none';
+  showToast(`✅ Applied ${applied} value${applied!==1?'s':''} to field record`);
+}
+
+function getSNSBase(crop,prev,rain,soil){
+  // Same as getSNS but without cover crop rules (avoids recursion)
   if(crop&&(crop.includes('Grass')||crop.includes('Clover')||crop.includes('CLIG3')||crop.includes('CNUM2')||crop.includes('CSAM3')||crop.includes('GS2')||crop.includes('GS4'))) return 0;
   if(prev&&prev.includes('long ley')) return 3;
   if(prev&&(prev.includes('Grass')||prev.includes('Beans'))) return 2;
@@ -1637,6 +1958,23 @@ function saveRecord(){
   if([9,10,11].includes(mo)){ document.getElementById('rec-warn').style.display='flex'; }
   save(); renderRecs(); renderNBal(); renderDash();
   alert('Application recorded ✓'); closeRecModal();
+}
+
+function autoFillArea(){
+  const fieldName = document.getElementById('rec-field').value;
+  const f = S.fields.find(ff => ff.name === fieldName);
+  if(f && f.ha) {
+    document.getElementById('rec-area').value = f.ha;
+    calcRecNutrients(); // recalculate nutrients with new area
+  }
+}
+
+function autoFillMPArea(){
+  const fieldName = document.getElementById('mp-field').value;
+  const f = S.fields.find(ff => ff.name === fieldName);
+  // no area field in MP form but rate is per ha so no change needed
+  // just recalc nutrients
+  calcMPNutrients();
 }
 
 function updateRecFieldSel(){
