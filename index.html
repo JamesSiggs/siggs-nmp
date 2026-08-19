@@ -6,6 +6,7 @@
 <title>Siggs & Co Ltd — Nutrient & Manure Planning</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root {
   --gd: #1a5c35; --gm: #2d8a52; --gl: #8bc53f;
@@ -163,6 +164,8 @@ tbody td{padding:9px 11px;vertical-align:middle}
   .main{max-width:100%;padding:8px}
   .page{display:block!important}
   .page:not(.active){display:none!important}
+  body.print-multi .page{display:none!important}
+  body.print-multi .page.print-sel{display:block!important;page-break-before:always}
   .card{box-shadow:none!important;border:1px solid #ccc;page-break-inside:avoid;margin-bottom:10px;padding:10px}
   .card-title{font-size:11pt}
   /* Print header watermark */
@@ -267,7 +270,7 @@ tbody td{padding:9px 11px;vertical-align:middle}
           <button class="btn btn-p" onclick="showPage('records');openRecModal('fert')">🧪 Record fertiliser applied</button>
           <button class="btn btn-s" onclick="showPage('nmp')">📋 View nutrient recommendations</button>
           <button class="btn btn-s" onclick="showPage('nvz')">⚠️ Check NVZ compliance</button>
-          <button class="btn btn-s" onclick="window.print()">🖨️ Print plan</button>
+          <button class="btn btn-s" onclick="printPlan(['pg-nmp','pg-manure','pg-nvz','pg-records','pg-fields','pg-smp','pg-risk'])">🖨️ Print combined plan</button>
         </div>
       </div>
     </div>
@@ -300,8 +303,12 @@ tbody td{padding:9px 11px;vertical-align:middle}
           <div class="fg"><label>Harvest Year</label><input id="f-year" placeholder="2025/26"></div>
         </div>
         <div class="fr">
-          <div class="fg"><label>Rainfall Region</label><select id="f-rain"><option>High (&gt;700mm)</option><option>Moderate (600–700mm)</option><option>Low (&lt;600mm)</option></select></div>
-          <div class="fg"><label>Predominant Soil</label><select id="f-soil"><option>Medium</option><option>Heavy Clay</option><option>Light/Sandy</option><option>Shallow</option><option>Peat</option></select></div>
+          <div class="fg"><label>Rainfall Region</label>
+            <select id="f-rain"><option>High (&gt;700mm)</option><option>Moderate (600–700mm)</option><option>Low (&lt;600mm)</option></select>
+            <button class="btn btn-s btn-sm" style="margin-top:5px" type="button" onclick="lookupFarmRainfall()">🌧️ Look up from postcode</button>
+            <div id="rain-lookup-result" style="font-size:11px;color:var(--gx);margin-top:4px"></div>
+          </div>
+          <div class="fg"><label>Predominant Soil</label><select id="f-soil"><option>Light sand soils</option><option>Shallow soils</option><option>Medium soils</option><option>Deep clayey soils</option><option>Deep silt soils</option><option>Organic soils</option><option>Peat soils</option></select></div>
         </div>
         <div class="fr">
           <div class="fg"><label>Area in NVZ (ha)</label><input id="f-nvzha" type="number" placeholder="0" oninput="calcDerog()"></div>
@@ -316,14 +323,22 @@ tbody td{padding:9px 11px;vertical-align:middle}
         <div class="fr"><div class="fg"><label>BASIS No.</label><input id="f-basis" value="R/FE/6620"></div><div class="fg"><label>Completion Date</label><input id="f-cdate" type="date"></div></div>
         <div class="fr"><div class="fg"><label>Review Date</label><input id="f-rdate" type="date"></div><div class="fg"><label>Plan Reference</label><input id="f-ref" placeholder="2025/26 NMP"></div></div>
       </div>
+      <div class="card">
+        <div class="card-hdr"><div class="card-title"><span class="ic">🔑</span>AI Soil Reader — API Key</div></div>
+        <p style="font-size:11px;color:var(--gx);margin-bottom:8px">Needed only for the AI Soil Reader (reading soil data from an uploaded photo, screenshot or PDF report). The spreadsheet importer below doesn't need this. Stored only in this browser's local storage — never sent anywhere except directly to Anthropic when you use the AI Soil Reader. Get a key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>.</p>
+        <div class="fr"><div class="fg" style="flex:1"><label>Anthropic API Key</label><input id="api-key-input" type="password" placeholder="sk-ant-..."></div><button class="btn btn-s btn-sm" style="align-self:flex-end;margin-bottom:14px" onclick="document.getElementById('api-key-input').type=document.getElementById('api-key-input').type==='password'?'text':'password'">👁</button></div>
+        <button class="btn btn-p btn-sm" onclick="saveApiKey()">Save Key</button>
+        <span id="api-key-status" style="font-size:11px;color:var(--gx);margin-left:8px"></span>
+      </div>
     </div>
   </div>
-  <div class="btn-grp"><button class="btn btn-p btn-lg" onclick="saveFarm()">💾 Save Farm Details</button><button class="btn btn-s btn-lg" onclick="showPage('fields')">Next: Fields →</button></div>
+  <div class="btn-grp"><button class="btn btn-p btn-lg" onclick="saveFarm()">💾 Save Farm Details</button><button class="btn btn-s btn-lg" onclick="showPage('fields')">Next: Fields →</button><button class="btn btn-s btn-lg" onclick="window.open('https://account.lessannoyingcrm.com','_blank')" title="Open Less Annoying CRM in a new tab">📋 Open CRM</button><button class="btn btn-lg" onclick="newFarm()" style="background:#fff3cd;color:#92400e;border:1.5px solid #f59e0b;margin-left:14px">🗋 New Farm</button></div>
 </div>
 
 <!-- FIELDS -->
 <div class="page" id="pg-fields">
-  <div class="sa"><div><div class="sh">Fields</div><div class="ss">Add fields, soil analysis and crop details.</div></div><div class="btn-grp"><button class="btn btn-s" onclick="openLayersModal()">📐 Import Layers</button><button class="btn btn-p" onclick="newField()">+ Add Field</button></div></div>
+  <div class="sa"><div><div class="sh">Fields</div><div class="ss">Add fields, soil analysis and crop details.</div></div><div class="btn-grp"><button class="btn btn-s" onclick="openLayersModal()">📐 Import Layers</button><button class="btn btn-s" onclick="document.getElementById('soil-bulk-file').click()">📊 Import soil analysis (CSV/Excel)</button><input type="file" id="soil-bulk-file" accept=".csv,.xlsx,.xls" style="display:none" onchange="soilBulkFile(this.files[0])"><button class="btn btn-p" onclick="newField()">+ Add Field</button></div></div>
+  <div id="soil-bulk-review" style="display:none;margin-bottom:14px"></div>
   <div class="g2">
     <div id="fld-list" style="max-height:620px;overflow-y:auto"><div style="text-align:center;padding:40px;color:var(--gx)">No fields yet — click <strong>Add Field</strong></div></div>
     <div id="fld-panel" style="display:none">
@@ -334,6 +349,7 @@ tbody td{padding:9px 11px;vertical-align:middle}
         <div class="tp active" id="ft-basics">
           <div class="fr"><div class="fg"><label>Field Name</label><input id="fd-name" placeholder="e.g. Big Monument"></div><div class="fg"><label>Area (ha)</label><input id="fd-ha" type="number" placeholder="3.57" step="0.01"></div></div>
           <div class="fr"><div class="fg"><label>OS Sheet</label><input id="fd-os" placeholder="SW9174"></div><div class="fg"><label>NG Number</label><input id="fd-ng" placeholder="4307"></div></div>
+          <div class="fr"><div class="fg"><label>Site / Block <small style="text-transform:none;font-weight:400;color:var(--gx)">— for farms split across more than one holding</small></label><input id="fd-site" placeholder="e.g. Home Farm, Higher Block"></div></div>
           <div class="fr">
             <div class="fg"><label>Current Crop</label>
               <select id="fd-crop" onchange="calcRB()">
@@ -373,7 +389,10 @@ tbody td{padding:9px 11px;vertical-align:middle}
                 <option value="Cover crop — legume (clover/vetch)">Cover crop — legume/clover/vetch (treat as Beans/Peas)</option>
               </optgroup>
             </select></div>
-            <div class="fg"><label>Soil Type</label><select id="fd-soiltype" onchange="calcRB()"><option>Medium</option><option>Heavy Clay</option><option>Light/Sandy</option><option>Shallow</option><option>Deep Clay</option><option>Peat</option></select></div>
+            <div class="fg"><label>Soil Type</label><select id="fd-soiltype" onchange="calcRB()"><option>Light sand soils</option><option>Shallow soils</option><option>Medium soils</option><option>Deep clayey soils</option><option>Deep silt soils</option><option>Organic soils</option><option>Peat soils</option></select>
+              <button class="btn btn-s btn-sm" style="margin-top:5px" type="button" onclick="suggestSoilscapes()">🌍 Suggest from Soilscapes</button>
+              <div id="soilscapes-result" style="font-size:11px;color:var(--gx);margin-top:4px"></div>
+            </div>
           </div>
           <div class="fr">
             <div class="fg"><label>In NVZ?</label><select id="fd-nvz"><option value="no">No</option><option value="yes">Yes</option></select></div>
@@ -498,7 +517,7 @@ tbody td{padding:9px 11px;vertical-align:middle}
 
 <!-- NMP -->
 <div class="page" id="pg-nmp">
-  <div class="sa"><div><div class="sh">Nutrient Management Plan</div><div class="ss">RB209 recommendations — <span id="nmp-farm">—</span> · Harvest <span id="nmp-yr">—</span></div></div><button class="btn btn-s" onclick="window.print()">🖨️ Print</button></div>
+  <div class="sa"><div><div class="sh">Nutrient Management Plan</div><div class="ss">RB209 recommendations — <span id="nmp-farm">—</span> · Harvest <span id="nmp-yr">—</span></div></div><div class="btn-grp"><button class="btn btn-s" onclick="printPlan(['pg-nmp'])">🖨️ Nutrient Plan</button><button class="btn btn-s" onclick="printPlan(['pg-manure','pg-nvz','pg-records'])">🖨️ Manure Plan</button><button class="btn btn-s" onclick="printPlan(['pg-fields','pg-smp','pg-risk'])">🖨️ Soil Plan</button><button class="btn btn-p" onclick="printPlan(['pg-nmp','pg-manure','pg-nvz','pg-records','pg-fields','pg-smp','pg-risk'])">🖨️ Combined Plan</button></div></div>
   <div class="card">
     <div class="card-hdr"><div class="card-title"><span class="ic">📊</span>Farm-Level Summary</div></div>
     <div class="g4">
@@ -541,17 +560,18 @@ tbody td{padding:9px 11px;vertical-align:middle}
   <div class="g2">
     <div class="card">
       <div class="card-hdr"><div class="card-title"><span class="ic">🐄</span>Livestock</div><button class="btn btn-s btn-sm" onclick="document.getElementById('lv-form').style.display='block'">+ Add</button></div>
-      <div class="tw"><table><thead><tr><th>Livestock</th><th>Units</th><th>% Housed</th><th>N/unit</th><th>Total N</th><th>Manure type</th><th></th></tr></thead><tbody id="lv-tbl"><tr><td colspan="7" style="text-align:center;color:var(--gx);padding:14px">No livestock added</td></tr></tbody></table></div>
+      <div class="tw"><table><thead><tr><th>Livestock</th><th>Units</th><th>% Housed</th><th>Months on farm</th><th>N/unit</th><th>Total N</th><th>Manure type</th><th></th></tr></thead><tbody id="lv-tbl"><tr><td colspan="8" style="text-align:center;color:var(--gx);padding:14px">No livestock added</td></tr></tbody></table></div>
       <div id="lv-form" style="display:none;margin-top:12px;padding:12px;background:var(--gu);border-radius:8px">
         <div class="fg"><label>Livestock Type</label>
           <select id="lv-type">
-            <option value="61">Beef cow ≤500kg (breeding)</option><option value="83">Beef cow >500kg (breeding)</option><option value="28">Beef steer 2–12 months</option><option value="50">Beef steer 12–24 months</option><option value="77">Dairy cow &lt;6,000L</option><option value="101">Dairy cow 6,000–9,000L</option><option value="115">Dairy cow >9,000L</option><option value="1.4">Calf &lt;2 months</option><option value="54">Non-breeding bull</option><option value="7.6">Sheep &lt;60kg</option><option value="11.9">Sheep >60kg</option><option value="330">1000 broiler places</option><option value="530">1000 layers (free range)</option><option value="400">1000 layers (caged)</option><option value="910">1000 female turkeys</option>
+            <option value="61">Beef cow ≤500kg (breeding)</option><option value="83">Beef cow >500kg (breeding)</option><option value="28">Beef steer 2–12 months</option><option value="50">Beef steer 12–24 months</option><option value="77">Dairy cow &lt;6,000L</option><option value="101">Dairy cow 6,000–9,000L</option><option value="115">Dairy cow >9,000L</option><option value="34.7">Dairy Replacements – 2–12 m</option><option value="61.0">Dairy Replacements – 12 m–1st Calf</option><option value="1.4">Calf &lt;2 months</option><option value="54">Non-breeding bull</option><option value="7.6">Sheep &lt;60kg</option><option value="11.9">Sheep >60kg</option><option value="330">1000 broiler places</option><option value="530">1000 layers (free range)</option><option value="400">1000 layers (caged)</option><option value="910">1000 female turkeys</option>
           </select>
         </div>
         <div class="fr">
           <div class="fg"><label>Number</label><input id="lv-units" type="number" placeholder="50"></div>
           <div class="fg"><label>% Year housed</label><input id="lv-housed" type="number" placeholder="50" min="0" max="100"></div>
         </div>
+        <div class="fg"><label>Months on farm <small style="text-transform:none;font-weight:400;color:var(--gx)">— for animals on farm only part of the year, e.g. contract-reared youngstock</small></label><input id="lv-months" type="number" placeholder="12" min="0" max="12" value="12"></div>
         <div class="fg"><label>Manure type</label>
           <select id="lv-mtype"><option>FYM Cattle Fresh</option><option>FYM Cattle Old</option><option>Slurry Cattle (6%)</option><option>Slurry Cattle (2%)</option><option>Poultry (60%)</option><option>Poultry (40%)</option></select>
         </div>
@@ -731,6 +751,13 @@ tbody td{padding:9px 11px;vertical-align:middle}
       <div class="nvz-lbl"><span>0</span><span id="nvz-lim-lbl">170 kg/ha</span></div>
       <div class="nvz-bar"><div class="nvz-fill ok" id="nvz-bar" style="width:0%"></div></div>
       <div id="nvz-status" class="alert al-g" style="margin-top:10px">✅ Enter farm area and livestock data to calculate</div>
+      <div style="margin-top:10px;border-top:1px solid var(--gy);padding-top:10px">
+        <button class="btn btn-s btn-sm" onclick="toggleCalendarN()">📅 Show Calendar Year N total</button>
+        <div id="cal-n-panel" style="display:none;margin-top:8px">
+          <div class="sr"><span class="sr-k">Total N applied, calendar year <span id="cal-n-year"></span> (organic + artificial)</span><span class="sr-v" id="cal-n-total">— kg</span></div>
+          <p style="font-size:10px;color:var(--gx)">Cross-check only — the Farm Limit above already runs on an annual livestock-production basis. This figure sums actual recorded applications within the calendar year, which is the period the regulations use for manure N record-keeping.</p>
+        </div>
+      </div>
     </div>
     <div class="card">
       <div class="card-hdr"><div class="card-title"><span class="ic">📅</span>Closed Periods — England NVZ</div></div>
@@ -745,6 +772,20 @@ tbody td{padding:9px 11px;vertical-align:middle}
       <p style="font-size:10px;color:var(--gx);margin-top:8px">¹ From 1 Sep for sandy/shallow soils. No statutory closed period for FYM but must not be applied when risk of pollution. NVZ land only.</p>
       <div class="alert al-a" style="margin-top:10px">⚠️ <strong>Farming Rules for Water</strong> apply to ALL farms — always assess risk before any application regardless of NVZ status.</div>
     </div>
+  </div>
+  <div class="card">
+    <div class="card-hdr"><div class="card-title"><span class="ic">♻️</span>Organic N — Planned vs Requirement</div></div>
+    <p style="font-size:11px;color:var(--gx);margin-bottom:10px">Crop-available N from organic manure applications recorded so far, against the total RB209 N requirement across all fields — so you can see at a glance when organic N is fully planned for the farm.</p>
+    <div class="sr"><span class="sr-k">Total RB209 N requirement (all fields)</span><span class="sr-v" id="orgn-req">— kg</span></div>
+    <div class="sr"><span class="sr-k">Available N from organic manure (recorded)</span><span class="sr-v" id="orgn-applied">— kg</span></div>
+    <div class="sr"><span class="sr-k" style="font-weight:700">Still to plan from organic or fertiliser</span><span class="sr-v" id="orgn-remain" style="font-size:16px">— kg</span></div>
+    <div class="nvz-bar"><div class="nvz-fill ok" id="orgn-bar" style="width:0%"></div></div>
+    <div id="orgn-status" class="alert al-g" style="margin-top:10px">Add fields and manure records to see organic N progress.</div>
+  </div>
+  <div class="card">
+    <div class="card-hdr"><div class="card-title"><span class="ic">🛒</span>Fertiliser Still Needed to Purchase</div></div>
+    <p style="font-size:11px;color:var(--gx);margin-bottom:10px">Farm-wide totals after deducting organic manure and any artificial fertiliser already recorded from the RB209 requirement. Feeds your tonnage calculator.</p>
+    <div class="tw"><table><thead><tr><th>Nutrient</th><th>RB209 requirement (kg)</th><th>Supplied so far (kg)</th><th>Still to buy (kg)</th></tr></thead><tbody id="buy-tbl"></tbody></table></div>
   </div>
   <div class="card">
     <div class="card-hdr"><div class="card-title"><span class="ic">📏</span>N-Max Limits per Crop (NVZ)</div></div>
@@ -767,8 +808,9 @@ tbody td{padding:9px 11px;vertical-align:middle}
 <div class="page" id="pg-records">
   <div class="sa">
     <div><div class="sh">Application Records</div><div class="ss">Record actual fertiliser and manure applications — for use on paper or phone/tablet.</div></div>
-    <div class="btn-grp"><button class="btn btn-p" onclick="openRecModal('manure')">+ Manure Application</button><button class="btn btn-p" onclick="openRecModal('fert')">+ Fertiliser Application</button></div>
+    <div class="btn-grp"><button class="btn btn-p" onclick="openRecModal('manure')">+ Manure Application</button><button class="btn btn-p" onclick="openRecModal('fert')">+ Fertiliser Application</button><button class="btn btn-s" onclick="document.getElementById('csv-import-file').click()">📥 Import farmer records (CSV)</button><input type="file" id="csv-import-file" accept=".csv" style="display:none" onchange="importFarmerCSV(this.files[0])"></div>
   </div>
+  <div id="csv-import-result" style="display:none;margin-bottom:14px"></div>
 
   <!-- ENTRY FORM -->
   <div id="rec-form" style="display:none">
@@ -795,6 +837,11 @@ tbody td{padding:9px 11px;vertical-align:middle}
           <div class="ni"><button onclick="adjRate(-0.5)">−</button><input id="rec-rate" type="number" placeholder="0" step="0.5" oninput="calcRecNutrients()"><button onclick="adjRate(0.5)">+</button></div>
         </div>
         <div class="fg"><label>Area applied (ha)</label><input id="rec-area" type="number" placeholder="0.0" step="0.1"></div>
+      </div>
+      <div class="fr" id="rec-incorp-row">
+        <div class="fg"><label>Incorporation <small style="text-transform:none;font-weight:400;color:var(--gx)">— affects N availability</small></label>
+          <select id="rec-incorp" onchange="calcRecNutrients()"><option value="none">Not incorporated</option><option value="6h">Incorporated within 6 hours</option><option value="24h">Incorporated within 24 hours</option></select>
+        </div>
       </div>
       <div id="rec-calc" style="background:var(--wh);border-radius:6px;padding:9px;margin-bottom:12px;font-size:12px;display:none;border:1px solid var(--gy)">
         <strong>Estimated nutrients:</strong>
@@ -929,9 +976,10 @@ tbody td{padding:9px 11px;vertical-align:middle}
   <div class="sa">
     <div>
       <div class="sh">Manure Spreading Risk Map</div>
-      <div class="ss">Farming Rules for Water — field-by-field risk assessment with live EA flood alerts</div>
+      <div class="ss">Farming Rules for Water — field-by-field risk assessment with live EA flood alerts<span id="risk-site-label"></span></div>
     </div>
     <div class="btn-grp">
+      <div class="fg" id="risk-site-wrap" style="display:none;margin:0;min-width:160px"><select id="risk-site-sel" onchange="setRiskSite(this.value)" style="font-size:13px;padding:8px 10px;border:1px solid #e5e7eb;border-radius:8px;background:#fff"></select></div>
       <button class="btn btn-p" onclick="checkLiveConditions()" id="live-btn">🌐 Check live conditions</button>
       <button class="btn btn-s" onclick="window.print()">🖨️ Print risk map</button>
     </div>
@@ -1133,7 +1181,7 @@ tbody td{padding:9px 11px;vertical-align:middle}
           <div style="font-weight:600;color:#1a5c35;margin-bottom:6px">Upload soil report or map screenshot</div>
           <div style="font-size:12px;color:#6b7280;margin-bottom:14px">Soil Benchmark · NRM / Cawood · Eurofins · scanned paper report · photo</div>
           <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-            <button class="btn btn-p" onclick="document.getElementById('wiz-soil-file').click()">📁 Upload image</button>
+            <button class="btn btn-p" onclick="document.getElementById('wiz-soil-file').click()">📁 Upload image / PDF</button>
             <button class="btn btn-s" onclick="wizSoilPaste()">📋 Paste from clipboard</button>
           </div>
           <input type="file" id="wiz-soil-file" accept="image/*,.pdf" style="display:none" onchange="wizSoilFile(event)">
@@ -1295,9 +1343,57 @@ tbody td{padding:9px 11px;vertical-align:middle}
 // ═══════════════════════════ STATE ═══════════════════════════
 let S = { farm:{}, fields:[], livestock:[], imports:[], records:[], manurePlan:[], selFld:null };
 try{ const d=localStorage.getItem('siggsNMP_v2'); if(d){ S=JSON.parse(d); renderAll(); } }catch(e){}
+loadApiKeyStatus();
 function save(){ try{ localStorage.setItem('siggsNMP_v2',JSON.stringify(S)); }catch(e){} }
 
 // ═══════════════════════════ EXPORT / IMPORT ═══════════════════════════
+async function lookupFarmRainfall(){
+  const post=(v('f-post')||'').trim().replace(/\s+/g,'').toUpperCase();
+  const out=document.getElementById('rain-lookup-result');
+  if(!post){ out.textContent='⚠️ Enter a postcode on this page first.'; return; }
+  out.textContent='Looking up…';
+  try{
+    // postcodes.io — free, no key needed
+    const geo=await fetch('https://api.postcodes.io/postcodes/'+encodeURIComponent(post));
+    const gd=await geo.json();
+    if(!gd.result){ out.textContent='⚠️ Postcode not found — check it is correct.'; return; }
+    const lat=gd.result.latitude, lon=gd.result.longitude;
+    // Open-Meteo ERA5 reanalysis — daily precipitation 1991–2020, no API key needed
+    const cm=await fetch('https://archive-api.open-meteo.com/v1/archive?latitude='+lat+'&longitude='+lon+'&start_date=1991-01-01&end_date=2020-12-31&daily=precipitation_sum&timezone=Europe%2FLondon');
+    const cd=await cm.json();
+    const vals=(cd.daily&&cd.daily.precipitation_sum)||[];
+    const totalMm=vals.reduce((s,x)=>s+(parseFloat(x)||0),0);
+    const years=30, mm=Math.round(totalMm/years);
+    const region=mm>700?'High (>700mm)':mm>=600?'Moderate (600–700mm)':'Low (<600mm)';
+    document.getElementById('f-rain').value=region;
+    out.innerHTML='🌧️ <strong>'+mm+' mm/year</strong> ('+( gd.result.admin_district||post)+') — set to <strong>'+region+'</strong>. ERA5 1991–2020 average. Remember to Save Farm Details.';
+  } catch(e){
+    out.textContent='⚠️ Could not retrieve rainfall data — check internet connection.';
+  }
+}
+function newFarm(){
+  const hasFarm = !!(S.farm.name || S.farm.farmName || S.fields.length || S.records.length);
+  if(hasFarm){
+    if(!confirm('This will clear all current farm data and start a blank plan.\n\nClick OK to export the current farm first, then the tool will reset.\nClick Cancel to go back.')) return;
+    exportData();
+  }
+  S = { farm:{}, fields:[], livestock:[], imports:[], records:[], manurePlan:[], selFld:null };
+  localStorage.removeItem('siggsNMP_v2');
+  // Clear all farm form inputs explicitly — renderAll() doesn't write back into these fields
+  ['f-name','f-farmname','f-addr1','f-addr2','f-county','f-post','f-sbi','f-cph',
+   'f-tel','f-mob','f-email','f-year','f-nvzha','f-grazha',
+   'f-ref','f-cdate','f-rdate'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
+  });
+  // Restore adviser defaults (these are hardcoded defaults, not client data)
+  sv('f-adv','James Siggs'); sv('f-facts','FE/6620'); sv('f-basis','R/FE/6620');
+  document.getElementById('hdrFarm').innerHTML='No farm loaded';
+  document.getElementById('dsh-nofarm').style.display='block';
+  document.getElementById('dsh-main').style.display='none';
+  renderAll();
+  showPage('farms');
+  showToast('✅ Ready for a new farm');
+}
 function exportData(){
   const farm = S.farm.farmName || S.farm.name || 'NMP';
   const date = new Date().toISOString().slice(0,10);
@@ -1400,7 +1496,7 @@ function calcDerog(){
 // ═══════════════════════════ FIELDS ═══════════════════════════
 function newField(){ S.selFld=null; clearFld(); document.getElementById('fld-panel').style.display='block'; document.getElementById('fld-title').textContent='New Field'; }
 function clearFld(){
-  ['fd-name','fd-ha','fd-os','fd-ng','fd-yield','fd-ph','fd-lime','fd-pmgl','fd-kmgl','fd-mgmgl','fd-om','fd-lab','fd-lroot','fd-armour','fd-worms','fd-biocred','fd-regennotes','fd-soilnotes','fd-anotes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['fd-name','fd-ha','fd-os','fd-ng','fd-site','fd-yield','fd-ph','fd-lime','fd-pmgl','fd-kmgl','fd-mgmgl','fd-om','fd-lab','fd-lroot','fd-armour','fd-worms','fd-biocred','fd-regennotes','fd-soilnotes','fd-anotes'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   ['fd-pidx','fd-kidx','fd-mgidx'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
 }
 function fTab(t,el){
@@ -1415,7 +1511,7 @@ function selField(i){
   document.getElementById('fld-title').textContent=f.name;
   document.querySelectorAll('#fld-list .fi').forEach((el,j)=>el.classList.toggle('sel',j===i));
   const sv=(id,val)=>{const e=document.getElementById(id);if(e)e.value=val||'';};
-  sv('fd-name',f.name);sv('fd-ha',f.ha);sv('fd-os',f.os);sv('fd-ng',f.ng);
+  sv('fd-name',f.name);sv('fd-ha',f.ha);sv('fd-os',f.os);sv('fd-ng',f.ng);sv('fd-site',f.site);
   sv('fd-crop',f.crop);sv('fd-yield',f.yield);sv('fd-prev',f.prev);sv('fd-soiltype',f.soiltype);
   sv('fd-nvz',f.nvz||'no');sv('fd-gc',f.gc);sv('fd-rain',f.rain);sv('fd-straw',f.straw);
   sv('fd-tdate',f.tdate);sv('fd-lab',f.lab);sv('fd-ph',f.ph);sv('fd-lime',f.lime);
@@ -1439,8 +1535,10 @@ function delField(){
 }
 function saveField(){
   const getMS=id=>Array.from(document.getElementById(id).selectedOptions).map(o=>o.value);
+  const existing = S.selFld!==null ? S.fields[S.selFld] : {};
   const f={
-    name:v('fd-name'),ha:pf('fd-ha'),os:v('fd-os'),ng:v('fd-ng'),
+    ...existing,
+    name:v('fd-name'),ha:pf('fd-ha'),os:v('fd-os'),ng:v('fd-ng'),site:v('fd-site'),
     crop:v('fd-crop'),yield:pf('fd-yield'),prev:v('fd-prev'),soiltype:v('fd-soiltype'),
     nvz:v('fd-nvz'),gc:v('fd-gc'),rain:v('fd-rain'),straw:v('fd-straw'),
     tdate:v('fd-tdate'),lab:v('fd-lab'),ph:pf('fd-ph'),lime:pf('fd-lime'),
@@ -1466,7 +1564,7 @@ function renderFldList(){
   if(!S.fields.length){ el.innerHTML='<div style="text-align:center;padding:40px;color:var(--gx)">No fields yet — click <strong>Add Field</strong></div>'; return; }
   el.innerHTML=S.fields.map((f,i)=>`
     <div class="fi${S.selFld===i?' sel':''}" onclick="selField(${i})">
-      <div><div class="fi-name">${f.name}</div><div class="fi-det">${f.os||'—'} ${f.ng||''} · ${f.soiltype||'—'} · pH ${f.ph||'?'}</div></div>
+      <div><div class="fi-name">${f.name}</div><div class="fi-det">${f.site?'<strong>'+f.site+'</strong> · ':''}${f.os||'—'} ${f.ng||''} · ${f.soiltype||'—'} · pH ${f.ph||'?'}</div></div>
       <div class="fi-r"><div class="fi-ha">${f.ha} ha</div><div class="fi-crop">${f.crop}</div></div>
     </div>`).join('');
 }
@@ -1613,7 +1711,7 @@ function wizSaveStep(){
       const existing=S.fields.find(f=>f.name===gf.name);
       if(!existing){
         S.fields.push({
-          name:gf.name, ha:gf.ha, os:'', ng:'', geom:gf.geom||null,
+          name:gf.name, ha:gf.ha, os:'', ng:'', site:'', geom:gf.geom||null,
           crop:'Grass - Grazed Swards', yield:0, prev:'Grass (perm)',
           soiltype:'Medium', nvz:'no', gc:'Average', rain:'700',
           ph:0, lime:0, pmgl:0, kmgl:0, mgmgl:0, om:0,
@@ -1694,6 +1792,46 @@ function geomBBox(geometry){
   return [minX,minY,maxX,maxY];
 }
 function bboxOverlap(a,b){ return a[0]<=b[2] && a[2]>=b[0] && a[1]<=b[3] && a[3]>=b[1]; }
+// Maps free-text Soilscapes SOILSCAPE/TEXTURE description to one of the 7 RB209 soil categories.
+// Keyword-based rather than an exhaustive lookup of all 27 Soilscapes units, since there's no official
+// Soilscapes→RB209 crosswalk — this is deliberately a "first guess to confirm or override", per James's
+// existing informal practice of using Soilscapes this way.
+function soilscapesToRB209(text){
+  const t=(text||'').toLowerCase();
+  if(t.includes('peat')) return 'Peat soils';
+  if(t.includes('shallow')) return 'Shallow soils';
+  if(t.includes('clay')) return 'Deep clayey soils';
+  if(t.includes('silt')) return 'Deep silt soils';
+  if(t.includes('sand')&&!t.includes('loam')) return 'Light sand soils';
+  if(t.includes('organic')) return 'Organic soils';
+  return 'Medium soils'; // loamy / mixed / unclear — safest default, matches RB209's medium/heavy bucket
+}
+async function suggestSoilscapes(){
+  const out=document.getElementById('soilscapes-result');
+  const f=S.selFld!==null?S.fields[S.selFld]:null;
+  if(!f||!f.geom){ out.textContent='⚠️ No field boundary on file for this field — import boundaries first, or set soil type manually.'; return; }
+  out.textContent='Looking up Soilscapes…';
+  try{
+    const bbox=geomBBox(f.geom);
+    const cx=(bbox[0]+bbox[2])/2, cy=(bbox[1]+bbox[3])/2;
+    const crs=detectCRS(f.geom);
+    const inSR=crs==='WGS84'?4326:27700;
+    const url='https://www.landis.org.uk/arcgis/rest/services/Soilscapes/natmapsoilscapes/FeatureServer/0/query'
+      +'?geometry='+encodeURIComponent(cx+','+cy)+'&geometryType=esriGeometryPoint&inSR='+inSR
+      +'&spatialRel=esriSpatialRelIntersects&outFields=SOILSCAPE,TEXTURE,DRAINAGE&returnGeometry=false&f=json';
+    const resp=await fetch(url);
+    const data=await resp.json();
+    const attrs=data&&data.features&&data.features[0]&&data.features[0].attributes;
+    if(!attrs){ out.textContent='⚠️ No Soilscapes data found at this location (may be outside England/Wales coverage, or off the 1:250,000 map edge).'; return; }
+    const desc=(attrs.SOILSCAPE||'')+' '+(attrs.TEXTURE||'');
+    const suggestion=soilscapesToRB209(desc);
+    document.getElementById('fd-soiltype').value=suggestion;
+    out.innerHTML='🌍 Soilscapes: <em>'+(attrs.SOILSCAPE||'—')+'</em> → suggested <strong>'+suggestion+'</strong>. 1:250,000 scale — confirm against your own knowledge of the field.';
+    calcRB();
+  }catch(e){
+    out.textContent='⚠️ Could not reach Soilscapes (check internet connection) — set soil type manually.';
+  }
+}
 // Area in hectares — uses turf's geodesic calc for WGS84, plain shoelace (metres) for BNG.
 function geoJsonAreaHa(geometry){
   if(!geometry||!geometry.coordinates) return 0;
@@ -1913,18 +2051,9 @@ async function wizSoilPaste(){
 async function wizReadSoil(b64,mimeType){
   showToast('🔍 Reading soil data...');
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:[
-        {type:'image',source:{type:'base64',media_type:mimeType,data:b64}},
-        {type:'text',text:'Extract soil data from this image. Return ONLY valid JSON: {"soiltype":"Medium|Heavy Clay|Light/Sandy|Shallow|Deep Clay|Peat","slope":"Gentle <5%|Moderate 5–12%|Steep ≥12.3%","drain":"Free draining|Land drains present|Poor draining","ph":0,"pmgl":0,"kmgl":0,"mgmgl":0,"om":0,"note":"brief summary"}. Omit fields you cannot see.'}
-      ]}]})
-    });
-    const data=await resp.json();
-    const raw=data.content?.[0]?.text||'';
-    const match=raw.match(/\{[\s\S]*\}/);
-    if(!match) throw new Error('No data found');
-    _wizSoilData=JSON.parse(match[0]);
+    const extracted = await callClaudeVision(b64, mimeType,
+      `Extract soil data from this image or PDF. Return ONLY valid JSON: {"soiltype":"${SOILTYPE_PROMPT_OPTS}","slope":"Gentle <5%|Moderate 5–12%|Steep ≥12.3%","drain":"Free draining|Land drains present|Poor draining","ph":0,"pmgl":0,"kmgl":0,"mgmgl":0,"om":0,"note":"brief summary"}. Omit fields you cannot see.`, 800);
+    _wizSoilData=extracted;
     // Show results
     const items=document.getElementById('wiz-soil-items');
     items.innerHTML='';
@@ -2023,12 +2152,22 @@ function wizSaveLivestock(){ save(); renderDash(); }
 function renderChecklist(){
   const el=document.getElementById('checklist-items');
   if(!el) return;
+  const orgRecs=S.records.filter(r=>MANURE_TOTALN[r.type]);
+  let reqN=0; S.fields.forEach(f=>{ reqN+=((f.rb||{}).n||0)*(f.ha||0); });
+  const orgN=orgRecs.reduce((s,r)=>s+(r.totalN||0),0);
+  const nvzHa=S.farm.nvzHa||S.farm.ha||0, grazPct=S.farm.ha>0?((S.farm.grazHa||0)/S.farm.ha)*100:0;
+  const nvzLimit=grazPct>=80?250:170;
+  const nvzNet=S.livestock.reduce((s,l)=>s+l.totalN,0)+S.imports.filter(i=>i.dir==='Import').reduce((s,i)=>s+i.totalN,0)-S.imports.filter(i=>i.dir==='Export').reduce((s,i)=>s+i.totalN,0);
   const steps=[
     { label:'Farm Details',     done:!!(S.farm.name&&S.farm.sbi),            action:"showPage('farms')",    icon:'🏡' },
     { label:'Fields imported',  done:S.fields.length>0,                       action:"startWizard()",        icon:'🗺️' },
-    { label:'Soil data',        done:S.fields.some(f=>f.ph>0||f.soiltype!=='Medium'), action:"showPage('fields')", icon:'🔬' },
+    { label:'Soil data',        done:S.fields.some(f=>f.ph>0||(f.soiltype&&f.soiltype!=='Light sand soils')), action:"showPage('fields')", icon:'🔬' },
     { label:'Crops & yields',   done:S.fields.some(f=>f.yield>0),             action:"showPage('fields')",   icon:'🌾' },
-    { label:'Livestock',        done:S.livestock.length>0||true,              action:"showPage('manure')",   icon:'🐄' },
+    { label:'Livestock',        done:S.livestock.length>0,                    action:"showPage('manure')",   icon:'🐄' },
+    { label:'Applications recorded', done:S.records.length>0,                 action:"showPage('records')",  icon:'📝' },
+    { label:'Incorporation set', done:orgRecs.length===0||orgRecs.every(r=>r.incorp), action:"showPage('records')", icon:'🚜' },
+    { label:'Organic N planned', done:reqN>0&&orgN>=reqN*0.95,                action:"showPage('nvz')",      icon:'♻️' },
+    { label:'NVZ compliant',    done:nvzHa>0&&(nvzNet/nvzHa)<=nvzLimit,        action:"showPage('nvz')",      icon:'⚖️' },
   ];
   el.innerHTML=steps.map(s=>`
     <div onclick="${s.action}" style="padding:12px;border-radius:8px;border:1.5px solid ${s.done?'#8bc53f':'#e5e7eb'};background:${s.done?'#f0f8f3':'#f9fafb'};cursor:pointer;text-align:center;transition:all .15s" onmouseover="this.style.borderColor='#1a5c35'" onmouseout="this.style.borderColor='${s.done?'#8bc53f':'#e5e7eb'}'">
@@ -2037,10 +2176,147 @@ function renderChecklist(){
     </div>`).join('');
 }
 
+// ── ANTHROPIC API (AI Soil Reader) ──
+// API key is stored separately from the farm-data S object (own localStorage key) so it survives
+// switching between clients via export/import, and isn't included in farm data exports.
+function getApiKey(){ return localStorage.getItem('siggsNMP_apiKey')||''; }
+function saveApiKey(){
+  const k=v('api-key-input').trim();
+  if(!k){ document.getElementById('api-key-status').textContent='Enter a key first.'; return; }
+  localStorage.setItem('siggsNMP_apiKey', k);
+  document.getElementById('api-key-status').textContent='✓ Saved to this browser.';
+  document.getElementById('api-key-input').value='';
+}
+function loadApiKeyStatus(){
+  const el=document.getElementById('api-key-status');
+  if(el) el.textContent=getApiKey()?'✓ A key is saved in this browser.':'No key saved yet.';
+}
+// Sends an image or PDF to Claude for data extraction. Handles the browser-CORS header Anthropic
+// requires for direct client-side calls, and routes PDFs to the 'document' content type (images need
+// 'image') — sending a PDF as an 'image' block, which the previous version of this feature did, is
+// rejected by the API.
+async function callClaudeVision(b64, mimeType, promptText, maxTokens){
+  const key=getApiKey();
+  if(!key) throw new Error('No Anthropic API key saved — add one on the Farm Setup page first.');
+  const isPdf = mimeType==='application/pdf';
+  const fileBlock = isPdf
+    ? { type:'document', source:{ type:'base64', media_type:'application/pdf', data:b64 } }
+    : { type:'image', source:{ type:'base64', media_type:mimeType||'image/png', data:b64 } };
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{
+      'content-type':'application/json',
+      'x-api-key': key,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body: JSON.stringify({
+      model:'claude-sonnet-4-6',
+      max_tokens: maxTokens||800,
+      messages:[{ role:'user', content:[ fileBlock, { type:'text', text:promptText } ] }]
+    })
+  });
+  const data = await resp.json();
+  if(data.error) throw new Error(data.error.message||'API error');
+  const raw = data.content?.[0]?.text||'';
+  const match = raw.match(/\{[\s\S]*\}/);
+  if(!match) throw new Error('No data found in the response');
+  return JSON.parse(match[0]);
+}
+// Shared soil-type wording for AI extraction prompts — kept as one constant so it can't drift out of
+// sync with the field dropdown again.
+const SOILTYPE_PROMPT_OPTS='Light sand soils|Shallow soils|Medium soils|Deep clayey soils|Deep silt soils|Organic soils|Peat soils';
+
+// ── BULK SOIL ANALYSIS IMPORT (CSV / Excel — NRM, Yara, or any lab export) ──
+// Heuristic column matching rather than AI, so this works without an API key and is instant.
+// Always shows a review/preview before writing anything, since this can overwrite existing field data.
+function soilColType(h){
+  const t=(h||'').trim().toLowerCase();
+  if(t.includes('date')||t.includes('sampled')) return 'tdate';
+  if(/field|sample\s*(ref|name|id|no)?$|sample$/.test(t)) return 'field';
+  if(/\bph\b/.test(t)) return 'ph';
+  if(/\bp\b/.test(t)||t.includes('phosphorus')||t.includes('olsen')) return t.includes('index')?'pidx':'pmgl';
+  if(/\bk\b/.test(t)||t.includes('potassium')) return t.includes('index')?'kidx':'kmgl';
+  if(/\bmg\b/.test(t)||t.includes('magnesium')) return t.includes('index')?'mgidx':'mgmgl';
+  if(/\bom\b/.test(t)||t.includes('organic matter')) return 'om';
+  if(t.includes('lab')||t.includes('ref')) return 'lab';
+  return null;
+}
+let _soilBulkRows=[];
+async function soilBulkFile(file){
+  if(!file) return;
+  const out=document.getElementById('soil-bulk-review');
+  out.style.display='block'; out.className='alert al-g'; out.innerHTML='Reading file…';
+  let rows=[];
+  try{
+    if(file.name.toLowerCase().endsWith('.csv')){
+      rows = parseCSV(await file.text());
+    } else {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:'', raw:false});
+      rows = rows.filter(r=>r.some(c=>String(c).trim()!==''));
+    }
+  } catch(e){ out.className='alert al-r'; out.innerHTML='⚠️ Could not read this file: '+e.message; return; }
+  if(rows.length<2){ out.className='alert al-r'; out.innerHTML='⚠️ No data rows found.'; return; }
+  const header=rows[0].map(h=>String(h));
+  const colMap=header.map(soilColType);
+  if(!colMap.includes('field')){ out.className='alert al-r'; out.innerHTML='⚠️ Could not find a Field/Sample name column. Headers found: '+header.join(', '); return; }
+  _soilBulkRows = rows.slice(1).map(r=>{
+    const rec={_match:null,_use:true};
+    colMap.forEach((type,i)=>{ if(type) rec[type]=String(r[i]!==undefined?r[i]:'').trim(); });
+    if(rec.field){ const f=S.fields.find(ff=>ff.name.toLowerCase()===rec.field.toLowerCase()); rec._match=f?f.name:null; }
+    return rec;
+  }).filter(r=>r.field);
+  renderSoilBulkReview();
+}
+function renderSoilBulkReview(){
+  const out=document.getElementById('soil-bulk-review');
+  if(!_soilBulkRows.length){ out.style.display='none'; return; }
+  out.className='card';
+  out.innerHTML = '<div class="card-hdr"><div class="card-title"><span class="ic">📊</span>Soil analysis import — review before applying</div></div>'
+    +'<div class="tw"><table><thead><tr><th></th><th>Sheet row</th><th>Matched field</th><th>pH</th><th>P</th><th>K</th><th>Mg</th><th>OM%</th></tr></thead><tbody>'
+    + _soilBulkRows.map((r,i)=>`<tr>
+        <td><input type="checkbox" ${r._use?'checked':''} onchange="_soilBulkRows[${i}]._use=this.checked"></td>
+        <td>${r.field}</td>
+        <td>${r._match?('<strong style="color:var(--gd)">'+r._match+'</strong>'):'<span style="color:#dc2626">no match — will be skipped</span>'}</td>
+        <td>${r.ph||''}</td><td>${r.pidx||r.pmgl||''}${r.pidx?' (Idx)':r.pmgl?' mg/l':''}</td>
+        <td>${r.kidx||r.kmgl||''}${r.kidx?' (Idx)':r.kmgl?' mg/l':''}</td>
+        <td>${r.mgidx||r.mgmgl||''}${r.mgidx?' (Idx)':r.mgmgl?' mg/l':''}</td>
+        <td>${r.om||''}</td>
+      </tr>`).join('') + '</tbody></table></div>'
+    + '<p style="font-size:11px;color:var(--gx);margin:8px 0">Rows with no matching field name are listed for visibility but will be skipped. Field names must match exactly (case-insensitive) — rename in the Sheet or in the tool if needed, then re-import.</p>'
+    + '<div class="btn-grp"><button class="btn btn-p btn-sm" onclick="applySoilBulk()">Apply checked rows</button><button class="btn btn-s btn-sm" onclick="document.getElementById(\'soil-bulk-review\').style.display=\'none\';_soilBulkRows=[]">Cancel</button></div>';
+}
+function applySoilBulk(){
+  let applied=0;
+  _soilBulkRows.forEach(r=>{
+    if(!r._use||!r._match) return;
+    const f=S.fields.find(ff=>ff.name===r._match); if(!f) return;
+    if(r.ph) f.ph=parseFloat(r.ph)||f.ph;
+    if(r.pmgl) f.pmgl=parseFloat(r.pmgl)||f.pmgl;
+    if(r.pidx) f.pidx=r.pidx;
+    if(r.kmgl) f.kmgl=parseFloat(r.kmgl)||f.kmgl;
+    if(r.kidx) f.kidx=r.kidx;
+    if(r.mgmgl) f.mgmgl=parseFloat(r.mgmgl)||f.mgmgl;
+    if(r.mgidx) f.mgidx=r.mgidx;
+    if(r.om) f.om=parseFloat(r.om)||f.om;
+    if(r.lab) f.lab=r.lab;
+    if(r.tdate) f.tdate=parseFlexDate(r.tdate).toISOString?parseFlexDate(r.tdate).getFullYear()+'-'+String(parseFlexDate(r.tdate).getMonth()+1).padStart(2,'0')+'-'+String(parseFlexDate(r.tdate).getDate()).padStart(2,'0'):f.tdate;
+    applied++;
+  });
+  save(); renderAll();
+  const out=document.getElementById('soil-bulk-review');
+  out.className='alert al-g'; out.innerHTML='✓ Applied soil analysis to '+applied+' field(s).';
+  _soilBulkRows=[];
+  document.getElementById('soil-bulk-file').value='';
+}
+
 // ═══════════════════════════ AI SOIL READER ═══════════════════════════
 // Accepted field mappings for review panel
 const SOIL_FIELDS = {
-  soiltype:  { label:'Soil Type',        id:'fd-soiltype',  type:'select', opts:['Medium','Heavy Clay','Light/Sandy','Shallow','Deep Clay','Peat'] },
+  soiltype:  { label:'Soil Type',        id:'fd-soiltype',  type:'select', opts:['Light sand soils','Shallow soils','Medium soils','Deep clayey soils','Deep silt soils','Organic soils','Peat soils'] },
   slope:     { label:'Slope',            id:'fd-slope',     type:'select', opts:['Gentle <5%','Moderate 5–12%','Steep ≥12.3%'] },
   drain:     { label:'Drainage',         id:'fd-drain',     type:'select', opts:['Free draining','Land drains present','Poor draining'] },
   runoff:    { label:'Runoff risk',      id:'fd-runoff',    type:'select', opts:['Rare','Sometimes','Often'] },
@@ -2106,11 +2382,11 @@ async function soilReaderAnalyse(b64, mimeType){
 
   const prompt = `You are reading a soil report, soil map screenshot, or field data sheet for a farm in Devon/Cornwall, UK.
 
-Extract any of the following data you can see in the image. Only include values you are confident about — do not guess.
+Extract any of the following data you can see in the image or PDF. Only include values you are confident about — do not guess.
 
 Return ONLY valid JSON in this exact format (omit any field you cannot find):
 {
-  "soiltype": "one of: Medium | Heavy Clay | Light/Sandy | Shallow | Deep Clay | Peat",
+  "soiltype": "one of: ${SOILTYPE_PROMPT_OPTS}",
   "slope": "one of: Gentle <5% | Moderate 5–12% | Steep ≥12.3%",
   "drain": "one of: Free draining | Land drains present | Poor draining",
   "runoff": "one of: Rare | Sometimes | Often",
@@ -2125,34 +2401,14 @@ Return ONLY valid JSON in this exact format (omit any field you cannot find):
 }
 
 Field being planned: ${fieldName}
-Image source may be: Soil Benchmark map, NRM/Cawood/Eurofins lab report, scanned paper form, or photograph.`;
+Source may be: Soil Benchmark map, NRM/Yara/Cawood/Eurofins lab report (PDF or image), scanned paper form, or photograph.`;
 
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:800,
-        messages:[{
-          role:'user',
-          content:[
-            { type:'image', source:{ type:'base64', media_type:mimeType, data:b64 }},
-            { type:'text', text:prompt }
-          ]
-        }]
-      })
-    });
-    const data = await resp.json();
-    const raw = data.content?.[0]?.text || '';
-    // Extract JSON from response
-    const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    if(!jsonMatch) throw new Error('No JSON in response');
-    const extracted = JSON.parse(jsonMatch[0]);
+    const extracted = await callClaudeVision(b64, mimeType, prompt, 800);
     _soilExtracted = extracted;
     soilReaderShowReview(extracted);
   } catch(e) {
-    showToast('❌ Could not read image: '+e.message,'err');
+    showToast('❌ Could not read file: '+e.message,'err');
   } finally {
     document.getElementById('soil-reader-loading').style.display='none';
   }
@@ -2386,7 +2642,7 @@ function renderSFISummary(){
 function renderNMP(){
   document.getElementById('nmp-farm').textContent=S.farm.name||'—';
   renderSFISummary();
-  document.getElementById('nmp-yr').textContent=S.farm.year||'—';
+  document.getElementById('nmp-yr').textContent=S.farm.year||currentHarvestYearLabel();
   const tb=document.getElementById('nmp-tbl');
   if(!S.fields.length){ tb.innerHTML='<tr><td colspan="15" style="text-align:center;color:var(--gx);padding:18px">Add fields to see recommendations</td></tr>'; return; }
   let totN=0,totP=0,totK=0,totLime=0;
@@ -2425,17 +2681,18 @@ function renderNMP(){
 function saveLivestock(){
   const npu=parseFloat(document.getElementById('lv-type').value);
   const units=pf('lv-units'), housed=pf('lv-housed');
+  const months=Math.min(12,Math.max(0,pf('lv-months')||12));
   const typeEl=document.getElementById('lv-type');
   const label=typeEl.options[typeEl.selectedIndex].text;
-  const totalN=units*(housed/100)*npu;
-  S.livestock.push({label,units,housed,nperunit:npu,totalN,mtype:v('lv-mtype')});
+  const totalN=units*(housed/100)*npu*(months/12);
+  S.livestock.push({label,units,housed,months,nperunit:npu,totalN,mtype:v('lv-mtype')});
   save(); renderLV(); renderNVZ(); document.getElementById('lv-form').style.display='none';
 }
 function renderLV(){
   const tb=document.getElementById('lv-tbl');
-  if(!S.livestock.length){ tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--gx);padding:14px">No livestock added</td></tr>'; return; }
+  if(!S.livestock.length){ tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--gx);padding:14px">No livestock added</td></tr>'; return; }
   tb.innerHTML=S.livestock.map((l,i)=>`
-    <tr><td>${l.label}</td><td>${l.units}</td><td>${l.housed}%</td><td>${l.nperunit}</td>
+    <tr><td>${l.label}</td><td>${l.units}</td><td>${l.housed}%</td><td>${l.months!==undefined?l.months:12}</td><td>${l.nperunit}</td>
     <td><strong>${l.totalN.toFixed(0)}</strong></td><td>${l.mtype}</td>
     <td><button class="btn btn-d btn-sm" onclick="delLV(${i})">✕</button></td></tr>`).join('');
 }
@@ -2643,6 +2900,50 @@ function renderMPSummary() {
 }
 
 // ═══════════════════════════ NVZ ═══════════════════════════
+// Organic N planned-vs-requirement, and farm-wide fertiliser-still-to-buy totals (N, P2O5, K2O, MgO, SO3)
+function renderOrgN(){
+  const elReq=document.getElementById('orgn-req'); if(!elReq) return; // page not yet rendered
+  let reqN=0,reqP=0,reqK=0,reqMg=0,reqS=0;
+  S.fields.forEach(f=>{
+    const rb=f.rb||{}; const ha=f.ha||0;
+    reqN+=(rb.n||0)*ha; reqP+=(rb.p||0)*ha; reqK+=(rb.k||0)*ha; reqMg+=(rb.mg||0)*ha; reqS+=(rb.s||0)*ha;
+  });
+  const orgRecs=S.records.filter(r=>MANURE_TOTALN[r.type]);
+  const fertRecs=S.records.filter(r=>!MANURE_TOTALN[r.type]);
+  const orgN=orgRecs.reduce((s,r)=>s+(r.totalN||0),0);
+  const orgP=orgRecs.reduce((s,r)=>s+(r.p||0)*(r.area||0),0);
+  const orgK=orgRecs.reduce((s,r)=>s+(r.k||0)*(r.area||0),0);
+  const fertN=fertRecs.reduce((s,r)=>s+(r.totalN||0),0);
+  const fertP=fertRecs.reduce((s,r)=>s+(r.p||0)*(r.area||0),0);
+  const fertK=fertRecs.reduce((s,r)=>s+(r.k||0)*(r.area||0),0);
+  const remainN=Math.max(0,reqN-orgN);
+  document.getElementById('orgn-req').textContent=reqN.toFixed(0)+' kg';
+  document.getElementById('orgn-applied').textContent=orgN.toFixed(0)+' kg';
+  document.getElementById('orgn-remain').textContent=remainN.toFixed(0)+' kg';
+  const pct=reqN>0?Math.min(100,(orgN/reqN)*100):0;
+  const bar=document.getElementById('orgn-bar'); if(bar){ bar.style.width=pct+'%'; bar.className='nvz-fill '+(pct>=95?'ok':pct>=50?'warn':'ok'); }
+  const st=document.getElementById('orgn-status');
+  if(st){
+    if(reqN===0) st.innerHTML='Add fields with crops to see the N requirement.';
+    else if(orgN<=0){ st.className='alert al-a'; st.innerHTML='⚠️ No organic manure applications recorded yet — '+reqN.toFixed(0)+' kg N still to plan (organic or fertiliser).'; }
+    else if(pct>=95){ st.className='alert al-g'; st.innerHTML='✅ Organic manure is planned to cover '+pct.toFixed(0)+'% of the farm N requirement.'; }
+    else { st.className='alert al-a'; st.innerHTML='⚠️ Organic manure covers '+pct.toFixed(0)+'% of N requirement so far — '+remainN.toFixed(0)+' kg still to plan.'; }
+  }
+  // Fertiliser still needed to purchase: requirement minus (organic available + artificial already recorded)
+  const buy=[
+    {label:'N',req:reqN,sup:orgN+fertN},
+    {label:'P₂O₅',req:reqP,sup:orgP+fertP},
+    {label:'K₂O',req:reqK,sup:orgK+fertK},
+    {label:'MgO',req:reqMg,sup:0},
+    {label:'SO₃',req:reqS,sup:0},
+  ];
+  const tb=document.getElementById('buy-tbl');
+  if(tb) tb.innerHTML=buy.map(b=>{
+    const still=Math.max(0,b.req-b.sup);
+    return '<tr><td><strong>'+b.label+'</strong></td><td>'+b.req.toFixed(0)+'</td><td>'+b.sup.toFixed(0)+'</td><td style="font-weight:700">'+still.toFixed(0)+'</td></tr>';
+  }).join('');
+}
+
 function renderNVZ(){
   const ha=S.farm.ha||0, nvzHa=S.farm.nvzHa||ha, grazHa=S.farm.grazHa||0;
   const pct=ha>0?(grazHa/ha)*100:0;
@@ -2675,7 +2976,86 @@ function renderNVZ(){
 }
 
 // ═══════════════════════════ RECORDS ═══════════════════════════
-const MANURE_N={'FYM Cattle Fresh':1.5,'FYM Cattle Old':1.3,'Slurry Cattle (6%)':1.4,'Slurry Cattle (2%)':0.9,'Poultry (40%)':11.4,'Poultry (60%)':16.8,'Sewage - Lime Stabilised':1.5,'Dirty Water':0.4,'Compost':0.6};
+// RB209 soil bucket per Table 2.9 footnote: "Sandy/shallow = light sand + shallow soils;
+// Medium/heavy = medium, deep silt, deep clay soils (also use this bucket for organic/peaty soils)"
+function soilBucket(soiltype){
+  const s=(soiltype||'').toLowerCase();
+  if(s.includes('light')||s.includes('shallow')) return 'sandy';
+  return 'medium';
+}
+function manureSeason(dateStr){
+  if(!dateStr) return 'spring';
+  const m=new Date(dateStr).getMonth()+1; // 1-12
+  if(m>=8&&m<=10) return 'autumn';
+  if(m===11||m===12||m===1) return 'winter';
+  if(m>=2&&m<=4) return 'spring';
+  return 'summer'; // May–Jul
+}
+function isGrassOrWOSR(crop){
+  crop=crop||''; return crop.includes('Grass')||crop.includes('Clover')||crop.includes('Oilseed Rape')&&crop.startsWith('W');
+}
+// Total N CONTENT (RB209 Tables 2.2, 2.5, 2.8) — kg N per m³ (slurry/dirty water) or per tonne (solids)
+const MANURE_TOTALN={'FYM Cattle Fresh':6.0,'FYM Cattle Old':6.0,'Slurry Cattle (6%)':2.6,'Slurry Cattle (2%)':1.6,'Poultry (40%)':19.0,'Poultry (60%)':28.0,'Sewage - Lime Stabilised':8.5,'Dirty Water':0.5,'Compost':7.5};
+// RB209 Table 2.9 — % of total N available to next crop, cattle slurry, by DM%, season, soil bucket, incorporation
+// surface = not soil-incorporated; inc6 = soil-incorporated within 6 hours (the only incorporation tier RB209 gives for liquid slurry)
+const SLURRY_AVAIL={
+  2:{ surface:{autumn:{sandy:5,medium:30},autumnGW:{sandy:10,medium:35},winter:{sandy:30,medium:30},spring:45,summer:35},
+      inc6:    {autumn:{sandy:5,medium:35},autumnGW:{sandy:10,medium:50},winter:{sandy:25,medium:35},spring:50,summer:null} },
+  6:{ surface:{autumn:{sandy:5,medium:25},autumnGW:{sandy:10,medium:30},winter:{sandy:25,medium:25},spring:35,summer:25},
+      inc6:    {autumn:{sandy:5,medium:30},autumnGW:{sandy:10,medium:35},winter:{sandy:20,medium:30},spring:40,summer:null} }
+};
+// RB209 Table 2.3 — FYM (fresh/old), surface vs incorporated within 24 hours (the only tier RB209 gives for solids)
+const FYM_AVAIL={
+  surface:{autumn:{sandy:5,medium:10},winter:{sandy:10,medium:10},spring:10,summer:10},
+  inc24:{ Fresh:{autumn:{sandy:5,medium:10},winter:{sandy:10,medium:10},spring:15,summer:null},
+          Old:  {autumn:{sandy:5,medium:10},winter:{sandy:10,medium:10},spring:10,summer:null} }
+};
+// RB209 Table 2.6 — poultry manure (40–80% DM band, which covers both app options), surface vs incorporated 24h
+const POULTRY_AVAIL={
+  surface:{autumn:{sandy:10,medium:25},autumnGW:{sandy:15,medium:30},winter:{sandy:20,medium:25},spring:30,summer:30},
+  inc24:  {autumn:{sandy:10,medium:30},autumnGW:{sandy:15,medium:35},winter:{sandy:20,medium:30},spring:40,summer:null}
+};
+// Returns fraction (0–1) of total N available to the crop, given material, application date, field soil type,
+// incorporation choice ('none'|'6h'|'24h') and crop (for the grass/winter-OSR bracket values).
+function manureNAvailPct(type, dateStr, soiltype, incorp, crop){
+  const season=manureSeason(dateStr), bucket=soilBucket(soiltype), gw=isGrassOrWOSR(crop);
+  const pick=(seasonTable)=>{
+    if(!seasonTable) return null;
+    if(season==='autumn') return (gw&&seasonTable.autumnGW)?seasonTable.autumnGW[bucket]:seasonTable.autumn[bucket];
+    if(season==='winter') return seasonTable.winter[bucket];
+    if(season==='spring') return seasonTable.spring;
+    return seasonTable.summer; // may be null -> caller falls back
+  };
+  if(type==='Slurry Cattle (2%)'||type==='Slurry Cattle (6%)'){
+    const dm=type==='Slurry Cattle (2%)'?2:6;
+    const t=SLURRY_AVAIL[dm];
+    // RB209 gives no 24h tier for liquid slurry — incorporation beyond the 6h window is treated as not incorporated
+    const tier = incorp==='6h' ? t.inc6 : t.surface;
+    let v=pick(tier);
+    if(v===null) v=pick(t.surface); // summer N/A for incorporated -> use surface value
+    return (v||0)/100;
+  }
+  if(type==='FYM Cattle Fresh'||type==='FYM Cattle Old'){
+    // RB209 gives no 6h tier for solids — either 6h or 24h achieves the "incorporated" benefit
+    if(incorp==='6h'||incorp==='24h'){
+      const sub=type==='FYM Cattle Fresh'?FYM_AVAIL.inc24.Fresh:FYM_AVAIL.inc24.Old;
+      let v=pick(sub); if(v===null) v=pick(FYM_AVAIL.surface);
+      return (v||0)/100;
+    }
+    return (pick(FYM_AVAIL.surface)||0)/100;
+  }
+  if(type==='Poultry (40%)'||type==='Poultry (60%)'){
+    if(incorp==='6h'||incorp==='24h'){
+      let v=pick(POULTRY_AVAIL.inc24); if(v===null) v=pick(POULTRY_AVAIL.surface);
+      return (v||0)/100;
+    }
+    return (pick(POULTRY_AVAIL.surface)||0)/100;
+  }
+  // Materials without a detailed RB209 season/soil table (dirty water, compost, biosolids) — flat typical values
+  const FLAT_AVAIL={'Dirty Water':0.35,'Compost':0,'Sewage - Lime Stabilised':0.15};
+  return FLAT_AVAIL[type]!==undefined?FLAT_AVAIL[type]:0;
+}
+const MANURE_N=MANURE_TOTALN; // kept for backward-compat checks elsewhere (e.g. renderRecs filter on MANURE_N[type])
 const MANURE_P={'FYM Cattle Fresh':3.1,'FYM Cattle Old':3.5,'Slurry Cattle (6%)':1.2,'Slurry Cattle (2%)':0.5,'Poultry (40%)':16.2,'Poultry (60%)':24.0,'Sewage - Lime Stabilised':22.0,'Dirty Water':0.1};
 const MANURE_K={'FYM Cattle Fresh':6.3,'FYM Cattle Old':5.0,'Slurry Cattle (6%)':3.0,'Slurry Cattle (2%)':1.8,'Poultry (40%)':11.1,'Poultry (60%)':16.0,'Sewage - Lime Stabilised':0.4,'Dirty Water':0.8};
 const FERT_N={'AN 34.5%N':345,'Urea 46%N':460,'Protected urea':460,'NPK 20:10:10':200,'NPK 24:5:5':240,'Sulphur 33N+SO₃':330};
@@ -2691,17 +3071,135 @@ function openRecModal(type){
 }
 function closeRecModal(){ document.getElementById('rec-form').style.display='none'; }
 
+function computeRecordNutrients(type, rate, fieldName, dateStr, incorp){
+  const isManure=!!MANURE_TOTALN[type];
+  const fld=S.fields.find(ff=>ff.name===fieldName);
+  let n=0,p=0,k=0,totalNContent=0,availPct=null;
+  if(isManure){
+    incorp=incorp||'none';
+    availPct=manureNAvailPct(type, dateStr, fld?fld.soiltype:'', incorp, fld?fld.crop:'');
+    totalNContent=MANURE_TOTALN[type]*rate;
+    n=totalNContent*availPct;
+    p=(MANURE_P[type]||0)*rate; k=(MANURE_K[type]||0)*rate;
+  } else {
+    n=FERT_N[type]?FERT_N[type]/1000*rate*10:0;
+    p=FERT_P[type]?FERT_P[type]/1000*rate*10:0;
+    k=FERT_K[type]?FERT_K[type]/1000*rate*10:0;
+  }
+  return {n,p,k,totalNContent,availPct,isManure,incorp:isManure?incorp:null};
+}
+// ── FARMER RECORDS MERGE-IMPORT ──
+// Additive CSV import: appends only NEW rows to S.records (does not wipe existing data, unlike the
+// full backup import/export). Designed to read a CSV exported from a Google Sheet that farmers fill
+// in via a Google Form — see the instruction manual for the recommended Form question list.
+// Expected headers (case-insensitive, order doesn't matter): Field, Date, Type, Rate, Area, Method,
+// Incorporation, Operator, Weather, Notes
+function parseCSV(text){
+  const rows=[]; let row=[],cell='',inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){ if(text[i+1]==='"'){cell+='"';i++;} else inQ=false; }
+      else cell+=c;
+    } else {
+      if(c==='"') inQ=true;
+      else if(c===','){ row.push(cell); cell=''; }
+      else if(c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n') i++; row.push(cell); rows.push(row); row=[]; cell=''; }
+      else cell+=c;
+    }
+  }
+  if(cell.length||row.length){ row.push(cell); rows.push(row); }
+  return rows.filter(r=>r.some(c=>c.trim()!==''));
+}
+function fuzzyMatchType(raw){
+  if(!raw) return null;
+  const norm=raw.trim().toLowerCase().replace(/[^a-z0-9]/g,'');
+  const all=Object.keys(MANURE_TOTALN).concat(Object.keys(FERT_N));
+  let exact=all.find(t=>t.toLowerCase().replace(/[^a-z0-9]/g,'')===norm); if(exact) return exact;
+  let partial=all.find(t=>{ const tn=t.toLowerCase().replace(/[^a-z0-9]/g,''); return tn.includes(norm)||norm.includes(tn); });
+  return partial||null;
+}
+// Accepts ISO (YYYY-MM-DD) and UK (DD/MM/YYYY or DD-MM-YYYY) formats — UK dates are ambiguous to the
+// native Date parser (e.g. "15/03/2026" is invalid as US-style MM/DD), so day/month order is detected explicitly.
+function parseFlexDate(raw){
+  raw=(raw||'').trim();
+  let m=raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3]));
+  m=raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if(m){ const a=parseInt(m[1]),b=parseInt(m[2]),y=parseInt(m[3]); let day=a,month=b; if(month>12){ day=b; month=a; } return new Date(y,month-1,day); }
+  const d=new Date(raw); return d;
+}
+function fuzzyMatchIncorp(raw){
+  const n=(raw||'').toLowerCase();
+  if(n.includes('6')) return '6h';
+  if(n.includes('24')) return '24h';
+  return 'none';
+}
+async function importFarmerCSV(file){
+  const out=document.getElementById('csv-import-result');
+  if(!file){ return; }
+  out.style.display='block'; out.className='alert al-g'; out.innerHTML='Reading file…';
+  const text=await file.text();
+  const rows=parseCSV(text);
+  if(rows.length<2){ out.className='alert al-r'; out.innerHTML='⚠️ No data rows found in this CSV.'; return; }
+  const header=rows[0].map(h=>h.trim().toLowerCase());
+  const idx=name=>header.findIndex(h=>h.includes(name));
+  const cFld=idx('field'), cDate=idx('date'), cType=idx('type'), cRate=idx('rate'), cArea=idx('area'),
+        cMethod=idx('method'), cIncorp=idx('incorp'), cOp=idx('operator'), cWx=idx('weather'), cNotes=idx('notes');
+  if(cFld<0||cDate<0||cType<0||cRate<0){ out.className='alert al-r'; out.innerHTML='⚠️ CSV must include at least Field, Date, Type and Rate columns. Found headers: '+header.join(', '); return; }
+  let imported=0, skipped=0, dup=0; const problems=[];
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i];
+    const fieldName=(r[cFld]||'').trim(), dateRaw=(r[cDate]||'').trim(), typeRaw=(r[cType]||'').trim();
+    const rate=parseFloat(r[cRate]); const area=cArea>=0?parseFloat(r[cArea])||0:0;
+    if(!fieldName||!dateRaw||!typeRaw||!rate||isNaN(rate)){ skipped++; problems.push('Row '+(i+1)+': missing field/date/type/rate'); continue; }
+    const fld=S.fields.find(f=>f.name.toLowerCase()===fieldName.toLowerCase());
+    if(!fld){ skipped++; problems.push('Row '+(i+1)+': field "'+fieldName+'" not found in this farm'); continue; }
+    let date=dateRaw; const dParsed=parseFlexDate(dateRaw); if(isNaN(dParsed.getTime())){ skipped++; problems.push('Row '+(i+1)+': unreadable date "'+dateRaw+'"'); continue; }
+    date=dParsed.getFullYear()+'-'+String(dParsed.getMonth()+1).padStart(2,'0')+'-'+String(dParsed.getDate()).padStart(2,'0');
+    const type=fuzzyMatchType(typeRaw);
+    if(!type){ skipped++; problems.push('Row '+(i+1)+': unrecognised product "'+typeRaw+'"'); continue; }
+    // Duplicate detection: same field+date+type+rate already recorded
+    const isDup=S.records.some(rr=>rr.field===fld.name&&rr.date===date&&rr.type===type&&Math.abs(rr.rate-rate)<0.05);
+    if(isDup){ dup++; continue; }
+    const incorp=cIncorp>=0?fuzzyMatchIncorp(r[cIncorp]):'none';
+    const calc=computeRecordNutrients(type, rate, fld.name, date, incorp);
+    S.records.push({ field:fld.name, date, type, rate, area:area||fld.ha||0,
+      n:parseFloat(calc.n.toFixed(1)), p:parseFloat(calc.p.toFixed(1)), k:parseFloat(calc.k.toFixed(1)),
+      totalN:parseFloat((calc.n*(area||fld.ha||0)).toFixed(1)), totalNContent:parseFloat((calc.totalNContent*(area||fld.ha||0)).toFixed(1)),
+      availPct:calc.availPct, incorp:calc.incorp,
+      method:cMethod>=0?(r[cMethod]||'').trim():'', operator:cOp>=0?(r[cOp]||'').trim():'',
+      weather:cWx>=0?(r[cWx]||'').trim():'', notes:cNotes>=0?(r[cNotes]||'').trim():'(imported from farmer record)' });
+    imported++;
+  }
+  save(); renderRecs(); renderNBal(); renderDash(); renderOrgN();
+  out.className=imported>0?'alert al-g':'alert al-a';
+  out.innerHTML='✓ Imported '+imported+' new record(s). '+dup+' already on file (skipped). '+skipped+' row(s) could not be read.'
+    +(problems.length?'<br><small>'+problems.slice(0,8).join('<br>')+(problems.length>8?'<br>…and '+(problems.length-8)+' more':'')+'</small>':'');
+  document.getElementById('csv-import-file').value='';
+}
+// Prints one or more pages as a single document — used for the individual Nutrient/Manure/Soil plans
+// and the combined plan. Restores the normal single-page-on-screen view afterwards.
+function printPlan(pageIds){
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('print-sel', pageIds.includes(p.id)));
+  document.body.classList.add('print-multi');
+  const cleanup=()=>{ document.body.classList.remove('print-multi'); document.querySelectorAll('.page').forEach(p=>p.classList.remove('print-sel')); window.removeEventListener('afterprint',cleanup); };
+  window.addEventListener('afterprint',cleanup);
+  window.print();
+  setTimeout(cleanup, 3000); // fallback for browsers that don't fire afterprint reliably
+}
 function calcRecNutrients(){
   const type=v('rec-type'), rate=pf('rec-rate');
+  const incorpRow=document.getElementById('rec-incorp-row');
+  const isManure=!!MANURE_TOTALN[type];
+  if(incorpRow) incorpRow.style.display=isManure?'grid':'none';
   if(!rate||rate<=0){ document.getElementById('rec-calc').style.display='none'; return; }
-  let n=0,p=0,k=0;
-  if(MANURE_N[type]){ n=(MANURE_N[type]||0)*rate; p=(MANURE_P[type]||0)*rate; k=(MANURE_K[type]||0)*rate; }
-  else if(FERT_N[type]){ n=(FERT_N[type]/1000)*rate*10; p=(FERT_P[type]||0)/1000*rate*10; k=(FERT_K[type]||0)/1000*rate*10; }
+  const r=computeRecordNutrients(type, rate, v('rec-field'), v('rec-date'), v('rec-incorp'));
   const calc=document.getElementById('rec-calc');
   calc.style.display='block';
-  document.getElementById('rc-n').textContent='N: '+n.toFixed(1)+' kg/ha';
-  document.getElementById('rc-p').textContent='P₂O₅: '+p.toFixed(1)+' kg/ha';
-  document.getElementById('rc-k').textContent='K₂O: '+k.toFixed(1)+' kg/ha';
+  document.getElementById('rc-n').textContent='N: '+r.n.toFixed(1)+' kg/ha avail.'+(isManure?' (total '+(MANURE_TOTALN[type]*rate).toFixed(1)+' kg/ha)':'');
+  document.getElementById('rc-p').textContent='P₂O₅: '+r.p.toFixed(1)+' kg/ha';
+  document.getElementById('rc-k').textContent='K₂O: '+r.k.toFixed(1)+' kg/ha';
 }
 
 function adjRate(d){ const el=document.getElementById('rec-rate'); el.value=(parseFloat(el.value||0)+d).toFixed(1); calcRecNutrients(); }
@@ -2710,14 +3208,12 @@ function saveRecord(){
   const field=v('rec-field'), date=v('rec-date'), type=v('rec-type');
   const rate=pf('rec-rate'), area=pf('rec-area');
   if(!field||!date||!type||!rate){ alert('Please fill in field, date, type and rate'); return; }
-  const n=(MANURE_N[type]||0)*rate||(FERT_N[type]?FERT_N[type]/1000*rate*10:0);
-  const p=(MANURE_P[type]||0)*rate||(FERT_P[type]?FERT_P[type]/1000*rate*10:0);
-  const k=(MANURE_K[type]||0)*rate||(FERT_K[type]?FERT_K[type]/1000*rate*10:0);
-  S.records.push({ field,date,type,rate,area,n:parseFloat(n.toFixed(1)),p:parseFloat(p.toFixed(1)),k:parseFloat(k.toFixed(1)),totalN:parseFloat((n*area).toFixed(1)),method:v('rec-method'),operator:v('rec-op'),weather:v('rec-wx'),notes:v('rec-notes') });
+  const r=computeRecordNutrients(type, rate, field, date, v('rec-incorp'));
+  S.records.push({ field,date,type,rate,area,n:parseFloat(r.n.toFixed(1)),p:parseFloat(r.p.toFixed(1)),k:parseFloat(r.k.toFixed(1)),totalN:parseFloat((r.n*area).toFixed(1)),totalNContent:parseFloat((r.totalNContent*area).toFixed(1)),availPct:r.availPct,incorp:r.incorp,method:v('rec-method'),operator:v('rec-op'),weather:v('rec-wx'),notes:v('rec-notes') });
   // Check closed period warning
   const mo=new Date(date).getMonth();
   if([9,10,11].includes(mo)){ document.getElementById('rec-warn').style.display='flex'; }
-  save(); renderRecs(); renderNBal(); renderDash();
+  save(); renderRecs(); renderNBal(); renderDash(); renderOrgN();
   alert('Application recorded ✓'); closeRecModal();
 }
 
@@ -2765,11 +3261,45 @@ function renderRecs(){
     <td>${r.totalN||0}</td><td>${r.operator||'—'}</td><td>${r.notes||''}</td>
     <td><button class="btn btn-d btn-sm" onclick="delRec(${S.records.indexOf(r)})">✕</button></td></tr>`).join('');
 }
-function delRec(i){ if(!confirm('Delete this record?'))return; S.records.splice(i,1); save(); renderRecs(); renderNBal(); renderDash(); }
+function delRec(i){ if(!confirm('Delete this record?'))return; S.records.splice(i,1); save(); renderRecs(); renderNBal(); renderDash(); renderOrgN(); }
+
+// ── HARVEST YEAR / CALENDAR YEAR ──
+// Harvest Year runs 1 Sep – 31 Aug and is the default frame everywhere (matches RB209 / industry convention).
+// Calendar Year (1 Jan–31 Dec) is kept available for the NVZ N-limit cross-check, behind a toggle, since that's
+// the period the regulations themselves use for livestock manure N accounting.
+function harvestYearRange(d){
+  d=d||new Date();
+  const y=d.getFullYear(), m=d.getMonth()+1; // 1-12
+  const startY = m>=9 ? y : y-1; // Sep onwards = start of this harvest year
+  return [new Date(startY,8,1), new Date(startY+1,7,31,23,59,59)];
+}
+function calendarYearRange(d){
+  d=d||new Date(); const y=d.getFullYear();
+  return [new Date(y,0,1), new Date(y,11,31,23,59,59)];
+}
+function dateInRange(dateStr,range){ if(!dateStr) return false; const t=new Date(dateStr).getTime(); return t>=range[0].getTime()&&t<=range[1].getTime(); }
+function currentHarvestYearLabel(){ return harvestYearRange()[1].getFullYear(); }
 
 function getAppN(fieldName){
-  return S.records.filter(r=>r.field===fieldName).reduce((s,r)=>s+(r.n||0),0);
+  const range=harvestYearRange();
+  return S.records.filter(r=>r.field===fieldName&&dateInRange(r.date,range)).reduce((s,r)=>s+(r.n||0),0);
 }
+// Whole-farm total N applied (organic + artificial) within the calendar year — NVZ cross-check, shown behind a toggle.
+function getCalendarYearAppliedN(){
+  const range=calendarYearRange();
+  return S.records.filter(r=>dateInRange(r.date,range)).reduce((s,r)=>s+(r.totalN||0),0);
+}
+function toggleCalendarN(){
+  const el=document.getElementById('cal-n-panel'); if(!el) return;
+  const show=el.style.display==='none';
+  el.style.display=show?'block':'none';
+  if(show){
+    const range=calendarYearRange();
+    document.getElementById('cal-n-year').textContent=range[0].getFullYear();
+    document.getElementById('cal-n-total').textContent=getCalendarYearAppliedN().toFixed(0)+' kg';
+  }
+}
+
 
 function renderNBal(){
   const tb=document.getElementById('nbal-tbl');
@@ -2831,7 +3361,7 @@ function renderAll(){
     const fn=RB209[f.crop];
     if(fn){ f.rb=fn(sns,parseInt(f.pidx)||1,f.kidx||'1',f.gc||'Average',f.yield||0); f.sns=sns; }
   });
-  renderFldList(); calcTotalArea(); renderManurePlan(); renderMPSummary(); renderDash(); renderNMP(); renderRecs(); renderNBal(); renderSMP(); renderNVZ(); renderLV(); renderIMP(); updateRecFieldSel(); if(S.farm.name){document.getElementById('hdrFarm').innerHTML='<strong>'+S.farm.name+'</strong>'; document.getElementById('dsh-nofarm').style.display='none'; document.getElementById('dsh-main').style.display='block';} }
+  renderFldList(); calcTotalArea(); renderManurePlan(); renderMPSummary(); renderDash(); renderNMP(); renderRecs(); renderNBal(); renderSMP(); renderNVZ(); renderOrgN(); renderLV(); renderIMP(); updateRecFieldSel(); if(S.farm.name){document.getElementById('hdrFarm').innerHTML='<strong>'+S.farm.name+'</strong>'; document.getElementById('dsh-nofarm').style.display='none'; document.getElementById('dsh-main').style.display='block';} }
 
 // ═══════════════════════════ UTILS ═══════════════════════════
 function v(id){ const e=document.getElementById(id); return e?e.value:''; }
@@ -2921,6 +3451,13 @@ function loadEllacottDemo() {
   });
   S.farm = {...ELLACOTT_DEMO.farm};
   S.fields = ELLACOTT_DEMO.fields.map(f => ({...f}));
+  // Ellacott spans three separate holdings — derive a Site/Block label from the field name prefix
+  // (e.g. "Lark 8447" -> "Lark") so the Site filter on the Risk Map has something to group by.
+  const SITE_NAMES = {Lark:'Larkbeare',Sun:'Sunnyside',Holw:'Holwell'};
+  S.fields.forEach(f=>{
+    const m = f.name.match(/^([A-Za-z]+)\s/);
+    if(m) f.site = SITE_NAMES[m[1]] || m[1];
+  });
   S.livestock = ELLACOTT_DEMO.livestock.map(l => ({...l}));
   S.imports = [];
   S.records = [];
@@ -3282,6 +3819,7 @@ showPage = function(id) {
     else { redrawMap(); }
   }
   if(id==='risk') {
+    populateRiskSiteOptions();
     if(!_riskReady){ _riskReady=true; setTimeout(()=>{ drawRiskMap(); resetRiskView(); },80); }
     else { drawRiskMap(); }
   }
@@ -3323,7 +3861,9 @@ function scoreField(f) {
   const soil = (f.soiltype||'').toLowerCase();
   if(soil.includes('clay')) { score+=1; reasons.push('Clay soil — slow infiltration, higher runoff risk'); }
   else if(soil.includes('shallow')) { score+=1; reasons.push('Shallow soil — limited buffering capacity'); }
-  else if(soil.includes('sandy')||soil.includes('light')) { score+=1; reasons.push('Light/sandy soil — leaching risk'); }
+  else if(soil.includes('silt')) { score+=1; reasons.push('Silt soil — erodible, moderate runoff risk'); }
+  else if(soil.includes('light')) { score+=1; reasons.push('Light sand soil — leaching risk'); }
+  else if(soil.includes('peat')) { reasons.push('Peat soil — high N mineralisation, monitor leaching'); }
 
   // NVZ
   if(f.nvz==='yes') { score+=1; reasons.push('In NVZ — closed period and N-max rules apply'); }
@@ -3471,6 +4011,7 @@ function drawRiskMap(){
 
   SVG_PATHS.forEach(p=>{
     const f=S.fields.find(ff=>ff.name===p.fn);
+    if(_riskSite && (!f || f.site!==_riskSite)) return; // hidden — belongs to a different site
     const risk = f ? scoreField(f) : null;
     const fill = risk ? getRiskColour(risk.level) : '#94a3b8';
 
@@ -3519,6 +4060,53 @@ function drawRiskMap(){
   setRiskView(_rvx,_rvy,_rvz);
   setTimeout(initRiskInteraction,30);
   renderRiskTable();
+}
+
+// ── SITE FILTER (split the map into separate holdings/blocks) ──
+let _riskSite = '';
+function populateRiskSiteOptions(){
+  const sites = [...new Set(S.fields.map(f=>f.site).filter(Boolean))].sort();
+  const wrap = document.getElementById('risk-site-wrap');
+  const sel = document.getElementById('risk-site-sel');
+  if(!wrap||!sel) return;
+  if(sites.length<2){ wrap.style.display='none'; _riskSite=''; document.getElementById('risk-site-label').textContent=''; return; }
+  wrap.style.display='block';
+  if(!sites.includes(_riskSite)) _riskSite='';
+  sel.innerHTML = '<option value="">🗺️ All sites</option>' + sites.map(s=>`<option value="${escHtml(s)}"${s===_riskSite?' selected':''}>${escHtml(s)}</option>`).join('');
+}
+function setRiskSite(site){
+  _riskSite = site;
+  document.getElementById('risk-site-label').textContent = site ? ' — '+site : '';
+  drawRiskMap();
+  const bbox = site ? fieldsBBox(f=>f.site===site) : null;
+  zoomFitRisk(bbox);
+}
+// Quick bbox scan over the SVG_PATHS 'd' strings (M x,y L x,y ... format) for fields matching predicate
+function fieldsBBox(predicate){
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity,any=false;
+  if(typeof SVG_PATHS==='undefined') return null;
+  SVG_PATHS.forEach(p=>{
+    const f=S.fields.find(ff=>ff.name===p.fn);
+    if(!f || !predicate(f)) return;
+    const nums=(p.d.match(/-?\d+\.?\d*/g)||[]).map(Number);
+    for(let i=0;i<nums.length-1;i+=2){ const x=nums[i],y=nums[i+1]; if(x<minX)minX=x; if(x>maxX)maxX=x; if(y<minY)minY=y; if(y>maxY)maxY=y; any=true; }
+  });
+  return any?[minX,minY,maxX,maxY]:null;
+}
+function zoomFitRisk(bbox){
+  if(!bbox){ resetRiskView(); return; }
+  const svg=document.getElementById('risk-svg'); if(!svg) return;
+  const vb=svg.viewBox.baseVal;
+  const [x0,y0,x1,y1]=bbox;
+  const w=Math.max(1,x1-x0), h=Math.max(1,y1-y0);
+  let scale=Math.min((vb.width*0.88)/w,(vb.height*0.88)/h);
+  scale=Math.min(12,Math.max(1,scale));
+  let tx=vb.width/2 - scale*(x0+x1)/2;
+  let ty=vb.height/2 - scale*(y0+y1)/2;
+  const maxTx=0, minTx=vb.width-vb.width*scale, maxTy=0, minTy=vb.height-vb.height*scale;
+  tx=Math.min(maxTx,Math.max(minTx,tx));
+  ty=Math.min(maxTy,Math.max(minTy,ty));
+  setRiskView(tx,ty,scale);
 }
 
 function showRiskTip(e,fn,risk){
@@ -3574,7 +4162,7 @@ function renderRiskTable(){
     tb.innerHTML='<tr><td colspan="11" style="text-align:center;color:var(--gx);padding:20px">Add fields to see risk assessment</td></tr>';
     return;
   }
-  const rows=S.fields.map(f=>{
+  const rows=S.fields.filter(f=>!_riskSite||f.site===_riskSite).map(f=>{
     const risk=scoreField(f);
     if(!risk) return '';
     const col={'HIGH':'#dc2626','MEDIUM':'#f59e0b','LOW':'#2d8a52'}[risk.level];
